@@ -152,3 +152,96 @@ window.FQ = [
     {t:'10 — Python versions × test files',e:'The matrix only expands on the python-version axis here.'},
   ]},
 ];
+
+window.FQ.push(
+  {t:'EDA',q:'Residential and Commercial buildings share similar Energy Consumption ranges. What does that mean for modelling?',a:2,opts:[
+    {t:'The model can perfectly separate them using Energy Consumption alone',e:'No. Similar ranges mean the energy values overlap, so energy alone cannot draw a clean boundary.'},
+    {t:'Energy Consumption must be removed from the dataset',e:'No. It can still be useful, but it is not sufficient by itself.'},
+    {t:'The model cannot perfectly separate them using energy alone',e:'Correct. If two classes have similar energy values, one feature cannot reliably tell them apart.'},
+    {t:'Residential and Commercial labels are automatically wrong',e:'No. Overlap is normal in real data and does not prove the labels are incorrect.'},
+  ]},
+  {t:'Feature Engineering',q:'Removing Square Footage drops accuracy by 4%. Removing Occupants drops it by 0.5%. What should you conclude?',a:1,opts:[
+    {t:'Occupants is the most important feature because its drop is smaller',e:'No. A smaller drop means the model lost less useful information.'},
+    {t:'Square Footage is more important; Occupants adds little value',e:'Correct. Removing Square Footage hurts much more, so it carries more predictive signal.'},
+    {t:'Both features are equally important',e:'No. A 4% drop and a 0.5% drop are meaningfully different.'},
+    {t:'Both features are leaking the target label',e:'No. Ablation drops alone do not prove leakage.'},
+  ]},
+  {t:'Feature Leakage',q:'Extended features gave 98% CV accuracy but 71% test accuracy. What most likely happened?',a:2,opts:[
+    {t:'The model became perfectly calibrated',e:'No. Calibration is about probability honesty, not a huge CV/test gap.'},
+    {t:'The test set is always wrong when it disagrees with CV',e:'No. The test set is the held-out check; disagreement is a warning.'},
+    {t:'One or more features encode the target label, making CV artificially high',e:'Correct. Near-perfect CV with a much lower test score often points to leakage or label-like features.'},
+    {t:'The model needs fewer validation folds',e:'No. Fewer folds would not fix leakage.'},
+  ]},
+  {t:'Permutation Importance',q:'Shuffling Energy Consumption drops accuracy from 64% to 41%. Shuffling Temperature drops it from 64% to 63%. What does this tell you?',a:0,opts:[
+    {t:'Energy Consumption is highly important; Temperature is nearly irrelevant',e:'Correct. Shuffling energy destroys useful signal, while shuffling temperature barely changes performance.'},
+    {t:'Temperature is more important because it changed less',e:'No. A small drop means the model did not rely on it much.'},
+    {t:'Both features are equally important',e:'No. A 23-point drop and a 1-point drop are not equal.'},
+    {t:'Permutation importance cannot compare features',e:'No. This is exactly what permutation importance is for.'},
+  ]},
+  {t:'Calibration',q:'A model says 90% probability Industrial for a building that is actually Commercial. This happens frequently. The model is:',a:3,opts:[
+    {t:'underfit — it cannot learn any pattern',e:'Not necessarily. The issue described is probability confidence, not only model capacity.'},
+    {t:'well calibrated — 90% means it is usually correct',e:'No. If 90% predictions are often wrong, the probabilities are not calibrated.'},
+    {t:'data-leaking — it knows the answer too well',e:'No. Leakage usually makes validation look too good; here the problem is confident wrong predictions.'},
+    {t:'overconfident — its probabilities are too extreme',e:'Correct. Frequent high-confidence mistakes mean the probabilities are too aggressive.'},
+  ]},
+  {t:'ROC vs Accuracy',q:'Your dataset has 90% Residential and 10% Industrial. A model that always predicts Residential gets 90% accuracy but AUC=0.5. What does AUC=0.5 mean?',a:1,opts:[
+    {t:'The model is excellent because accuracy is 90%',e:'No. Accuracy is inflated by class imbalance.'},
+    {t:'The model performs no better than random for separating classes',e:'Correct. AUC=0.5 means the ranking ability is random.'},
+    {t:'The model has perfect recall for Industrial',e:'No. It never predicts Industrial.'},
+    {t:'The dataset is balanced',e:'No. The prompt says it is 90/10 imbalanced.'},
+  ]},
+  {t:'Accuracy Ceiling',q:'The synthetic experiment showed accuracy does not improve when n_samples increases from 1000 to 10000 with fixed class_sep=0.5. What should you do next?',a:2,opts:[
+    {t:'Collect the same kind of rows forever',e:'No. More rows with the same overlap will not create new separation.'},
+    {t:'Switch to a deeper model immediately',e:'A deeper model may still hit the same data ceiling.'},
+    {t:'Engineer better features or collect different attributes — not more rows',e:'Correct. The bottleneck is class separation, so the feature information must improve.'},
+    {t:'Delete the validation set',e:'No. Removing validation only hides the ceiling.'},
+  ]},
+  {t:'Hyperparameter Tuning',q:'You tuned XGBoost on the test set and found max_depth=7 gives 72% accuracy. You report 72%. What is wrong?',a:0,opts:[
+    {t:'You used the test set for tuning, so 72% is optimistic and cannot be trusted',e:'Correct. The test set has leaked into model selection and is no longer an unbiased final check.'},
+    {t:'max_depth can never equal 7',e:'XGBoost supports max_depth=7.'},
+    {t:'Accuracy cannot be used with XGBoost',e:'Accuracy is allowed for classification, though it is not the only metric.'},
+    {t:'The score is automatically pessimistic',e:'No. Tuning on the test set usually makes the reported score too optimistic.'},
+  ]},
+  {t:'Learning Curves',q:'Training accuracy = 95% at 100 rows. Training accuracy = 82% at 1000 rows. Validation accuracy stays at 63% throughout. What is happening?',a:3,opts:[
+    {t:'The model gets worse because more data is harmful',e:'No. Lower training accuracy with more data often means less memorisation.'},
+    {t:'Validation is broken because it does not increase',e:'Not necessarily. It may reflect a real ceiling from overlapping classes.'},
+    {t:'The model is becoming perfectly calibrated',e:'Calibration is not measured by these two accuracy lines.'},
+    {t:'The model overfits less with more data, but the validation ceiling is from class overlap, not the model',e:'Correct. More data reduces memorisation, but overlap still limits validation accuracy.'},
+  ]},
+  {t:'Stacking',q:'The stacking meta-model is a LogisticRegression trained on out-of-fold predictions. Why out-of-fold and not in-sample predictions?',a:1,opts:[
+    {t:'Out-of-fold predictions are faster to compute',e:'They are usually more expensive, because base models train multiple times.'},
+    {t:'In-sample predictions are overfitted — base models would predict training rows too accurately, giving the meta-model misleading signals',e:'Correct. OOF predictions mimic how base models behave on unseen rows.'},
+    {t:'LogisticRegression cannot train on in-sample predictions',e:'It can, but the signals would be leaked and over-optimistic.'},
+    {t:'Out-of-fold predictions remove the need for a test set',e:'No. You still need a final held-out test set.'},
+  ]},
+  {t:'OvR vs Softmax',q:'OvR raw sigmoid outputs are [0.72, 0.68, 0.69]. Softmax outputs [0.35, 0.33, 0.32] for the same building. What does this tell you?',a:2,opts:[
+    {t:'OvR probabilities are already a perfect distribution',e:'No. The raw OvR outputs sum to 2.09, not 1.'},
+    {t:'Softmax forgot one class',e:'No. Softmax gives one probability per class and they sum to 1.'},
+    {t:'OvR classifiers are not jointly trained, so their raw outputs do not form a distribution — normalisation is a post-hoc fix',e:'Correct. Each OvR classifier answers a separate yes/no question.'},
+    {t:'Softmax cannot handle multiclass classification',e:'Softmax is designed for multiclass classification.'},
+  ]},
+  {t:'Attention Classifier',q:'You increase bandwidth w from 2.0 to 0.1. Validation accuracy drops from 62% to 54%. Why?',a:3,opts:[
+    {t:'At w=0.1, all training points vote equally',e:'Equal voting happens when bandwidth is very large, not very small.'},
+    {t:'The model stops using distances',e:'It still uses distances; it just makes nearby points dominate too strongly.'},
+    {t:'The model becomes linear',e:'Attention does not become a linear classifier when bandwidth changes.'},
+    {t:'At w=0.1, only the single nearest neighbour matters — the model overfits to individual training points',e:'Correct. Tiny bandwidth makes predictions too local and noisy.'},
+  ]},
+  {t:'L2 Regularisation',q:'You set alpha=10.0 in LogisticRegressionOvR. Training accuracy drops from 91% to 68% and CV accuracy also drops from 63% to 59%. What happened?',a:0,opts:[
+    {t:'Regularisation is too strong — it prevents the model from fitting even real patterns in the data',e:'Correct. When both training and CV drop, the model is underfitting.'},
+    {t:'The model is overfitting more than before',e:'No. Training accuracy dropped sharply, so it is not memorising the training data.'},
+    {t:'The labels were shuffled automatically',e:'Alpha does not shuffle labels.'},
+    {t:'The test set leaked into training',e:'The symptom described is excessive regularisation, not leakage.'},
+  ]},
+  {t:'Docker',q:'The Dockerfile runs python -m src.train at build time, not at container start. Training takes 45 seconds. You deploy 10 containers simultaneously. How long does each container take to start?',a:1,opts:[
+    {t:'45 seconds each, because every container retrains',e:'No. Training already happened during image build.'},
+    {t:'Near zero — training happened once at build time, and the model is baked into the image',e:'Correct. Startup only launches the already-built application.'},
+    {t:'450 seconds, because 10 containers train one after another',e:'No. The containers do not retrain at startup.'},
+    {t:'It depends on cross-validation folds at startup',e:'Cross-validation is part of training, which already happened at build time.'},
+  ]},
+  {t:'CI',q:'Your CI matrix tests Python 3.10 and 3.12. A walrus operator := was added to src/models.py. Python 3.10 supports it. Python 3.9 does not. Both CI jobs pass. What does this tell you?',a:2,opts:[
+    {t:'The code is guaranteed to work on every Python version',e:'No. CI only proves the versions it actually runs.'},
+    {t:'The code definitely works on Python 3.9',e:'No. Python 3.9 was not in the matrix.'},
+    {t:'The code is compatible with 3.10 and 3.12, but you have no guarantee about 3.9',e:'Correct. A CI matrix only tests the versions you specify.'},
+    {t:'The walrus operator is unsupported in 3.10',e:'Python 3.10 supports the walrus operator.'},
+  ]},
+);

@@ -218,6 +218,8 @@ window.generateData = function() {
   return { X: X, y: y };
 };
 
+window._cachedData = window._cachedData || window.generateData();
+
 /* ── Canvas renderers ───────────────────────────────────────────────── */
 window.renderLandscape = function(canvas, X, yb, path, alpha) {
   if (!canvas) return;

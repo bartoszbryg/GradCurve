@@ -237,7 +237,31 @@ scores = cross_validate_custom(LogisticRegressionOvR, {}, X, y, make_skf(3))
 # Output changes to 3 accuracy values`],
   ['callout', 'info', 'What this tells you', '- Real code uses the same names you see in src/.\n- Real outputs anchor the lesson in training data, not guesses.\n- Changing arguments changes shapes, scores, speed, or validation behavior.'],
   ['callout', 'analogy', 'Real world', "In a bank, hospital, factory, or retail chain, this same pattern prevents teams from trusting examples that do not match the production code."],
-  ['quiz', [{q:"What happens if you change StandardScaler.fit() from X_train to the full X before cross-validation?",a:1,opts:[{t:"The score becomes more honest because every fold uses more data.",e:"No. The validation fold leaks into the scaler statistics."},{t:"The CV score can become too high because validation statistics leak into training.",e:"Correct. This is data leakage."},{t:"The model stops running because StandardScaler requires fold indices.",e:"StandardScaler does not know about folds."},{t:"Only the test set changes; CV is unaffected.",e:"CV is affected immediately."}]}]],
+  ['quiz', [{q:"What happens if you change StandardScaler.fit() from X_train to the full X before cross-validation?",a:1,opts:[{t:"The score becomes more honest because every fold uses more data.",e:"No. The validation fold leaks into the scaler statistics."},{t:"The CV score can become too high because validation statistics leak into training.",e:"Correct. This is data leakage."},{t:"The model stops running because StandardScaler requires fold indices.",e:"StandardScaler does not know about folds."},{t:"Only the test set changes; CV is unaffected.",e:"CV is affected immediately."}]},
+    {q:'Concept check. Why should you test a model on data it did not train on?',a:2,opts:[
+      {t:'Because training data is always stored in a different file format',e:'File format is not the reason. The issue is whether the model generalizes beyond rows it already saw.'},
+      {t:'Because unseen data makes the model train faster',e:'Validation does not speed up training. It measures whether training learned a useful pattern.'},
+      {t:'Because training accuracy can be overly optimistic when the model memorizes patterns',e:'Correct. Unseen validation or test data reveals whether the model learned general rules.'},
+      {t:'Because test data changes the learned weights after training',e:'A proper test set should not update weights. It is only used for evaluation.'},
+    ]},
+    {q:'Prediction check. If validation accuracy is much lower than training accuracy, what should you inspect first?',a:0,opts:[
+      {t:'Overfitting, leakage, and whether the validation split matches the real task',e:'Correct. A large gap means the model may not generalize, or the evaluation setup may be flawed.'},
+      {t:'Only the color palette in the dashboard',e:'Visual design matters, but it does not explain a train-validation performance gap.'},
+      {t:'Whether Python printed enough decimal places',e:'Formatting can hide tiny differences, but it does not cause a large accuracy gap.'},
+      {t:'Whether the model file name is short enough',e:'File names do not explain model generalization problems.'},
+    ]},
+    {q:'What would you change? A validation score looks too good because StandardScaler was fit before cross-validation. Which code change fixes the leakage?',a:1,opts:[
+      {t:'Fit StandardScaler once on the full dataset before the fold loop',e:'That is the problem. The validation fold would influence the mean and standard deviation used for training.'},
+      {t:'Inside each fold, fit StandardScaler only on X_train, then transform X_train and X_val with that scaler',e:'Correct. The validation fold stays unseen, so the score is a fairer estimate of generalisation.'},
+      {t:'Fit StandardScaler separately on X_train and X_val inside each fold',e:'That also leaks information. Validation data would get its own statistics, which the model would not have at deployment time.'},
+      {t:'Remove cross-validation and report training accuracy only',e:'That hides the problem instead of fixing it. Training accuracy cannot measure generalisation.'},
+    ]},
+    {q:'Trace the output. What does this snippet print? scores=[0.72,0.68,0.60]; total=sum(scores); print([round(s/total,2) for s in scores])',a:2,opts:[
+      {t:'[0.72, 0.68, 0.60]',e:'Those are the raw scores. The code divides each score by the total, so the values must change.'},
+      {t:'[1.00, 1.00, 1.00]',e:'Dividing by the total does not make each item one. It makes the whole list sum to one.'},
+      {t:'[0.36, 0.34, 0.30]',e:'Correct. The total is 2.00, so the normalised values are 0.72/2, 0.68/2, and 0.60/2.'},
+      {t:'[0.33, 0.33, 0.33]',e:'That would be a uniform distribution. The original scores are not equal, so the normalised values are not equal.'},
+    ]}]],
 );
 window.BLOCKS[4].push(
   ['h2', "Exact source code - Logistic Regression OvR"],
@@ -552,7 +576,31 @@ sm = LogisticRegressionSoftmax(alpha=0.01).fit(X_scaled, y)
 # Output changes: W_ values are pulled toward zero`],
   ['callout', 'info', 'What this tells you', '- Real code uses the same names you see in src/.\n- Real outputs anchor the lesson in training data, not guesses.\n- Changing arguments changes shapes, scores, speed, or validation behavior.'],
   ['callout', 'analogy', 'Real world', "In a bank, hospital, factory, or retail chain, this same pattern prevents teams from trusting examples that do not match the production code."],
-  ['quiz', [{q:"What happens if you change feature_set from core to extended before fitting LogisticRegressionSoftmax?",a:2,opts:[{t:"The model still has two weights because softmax only supports two features.",e:"Softmax supports any numeric feature count."},{t:"The probabilities stop summing to one.",e:"Softmax probabilities still sum to one."},{t:"W_ changes from shape (3, 2) to (3, 4), adding two weights per class.",e:"Correct. One weight is learned per class per feature."},{t:"The class list changes from three classes to four classes.",e:"Classes are unchanged; features changed."}]}]],
+  ['quiz', [{q:"What happens if you change feature_set from core to extended before fitting LogisticRegressionSoftmax?",a:2,opts:[{t:"The model still has two weights because softmax only supports two features.",e:"Softmax supports any numeric feature count."},{t:"The probabilities stop summing to one.",e:"Softmax probabilities still sum to one."},{t:"W_ changes from shape (3, 2) to (3, 4), adding two weights per class.",e:"Correct. One weight is learned per class per feature."},{t:"The class list changes from three classes to four classes.",e:"Classes are unchanged; features changed."}]},
+    {q:'Concept check. Why should you test a model on data it did not train on?',a:2,opts:[
+      {t:'Because training data is always stored in a different file format',e:'File format is not the reason. The issue is whether the model generalizes beyond rows it already saw.'},
+      {t:'Because unseen data makes the model train faster',e:'Validation does not speed up training. It measures whether training learned a useful pattern.'},
+      {t:'Because training accuracy can be overly optimistic when the model memorizes patterns',e:'Correct. Unseen validation or test data reveals whether the model learned general rules.'},
+      {t:'Because test data changes the learned weights after training',e:'A proper test set should not update weights. It is only used for evaluation.'},
+    ]},
+    {q:'Prediction check. If validation accuracy is much lower than training accuracy, what should you inspect first?',a:0,opts:[
+      {t:'Overfitting, leakage, and whether the validation split matches the real task',e:'Correct. A large gap means the model may not generalize, or the evaluation setup may be flawed.'},
+      {t:'Only the color palette in the dashboard',e:'Visual design matters, but it does not explain a train-validation performance gap.'},
+      {t:'Whether Python printed enough decimal places',e:'Formatting can hide tiny differences, but it does not cause a large accuracy gap.'},
+      {t:'Whether the model file name is short enough',e:'File names do not explain model generalization problems.'},
+    ]},
+    {q:'What would you change? A validation score looks too good because StandardScaler was fit before cross-validation. Which code change fixes the leakage?',a:1,opts:[
+      {t:'Fit StandardScaler once on the full dataset before the fold loop',e:'That is the problem. The validation fold would influence the mean and standard deviation used for training.'},
+      {t:'Inside each fold, fit StandardScaler only on X_train, then transform X_train and X_val with that scaler',e:'Correct. The validation fold stays unseen, so the score is a fairer estimate of generalisation.'},
+      {t:'Fit StandardScaler separately on X_train and X_val inside each fold',e:'That also leaks information. Validation data would get its own statistics, which the model would not have at deployment time.'},
+      {t:'Remove cross-validation and report training accuracy only',e:'That hides the problem instead of fixing it. Training accuracy cannot measure generalisation.'},
+    ]},
+    {q:'Trace the output. What does this snippet print? scores=[0.72,0.68,0.60]; total=sum(scores); print([round(s/total,2) for s in scores])',a:2,opts:[
+      {t:'[0.72, 0.68, 0.60]',e:'Those are the raw scores. The code divides each score by the total, so the values must change.'},
+      {t:'[1.00, 1.00, 1.00]',e:'Dividing by the total does not make each item one. It makes the whole list sum to one.'},
+      {t:'[0.36, 0.34, 0.30]',e:'Correct. The total is 2.00, so the normalised values are 0.72/2, 0.68/2, and 0.60/2.'},
+      {t:'[0.33, 0.33, 0.33]',e:'That would be a uniform distribution. The original scores are not equal, so the normalised values are not equal.'},
+    ]}]],
 );
 window.BLOCKS[6].push(
   ['h2', "Exact source code - Attention Classifier"],
@@ -765,7 +813,31 @@ xgb = build_models()['xgboost'].fit(X_train, y_train)
 # Output: xgb.predict_proba(X_test) returns 3 columns`],
   ['callout', 'info', 'What this tells you', '- Real code uses the same names you see in src/.\n- Real outputs anchor the lesson in training data, not guesses.\n- Changing arguments changes shapes, scores, speed, or validation behavior.'],
   ['callout', 'analogy', 'Real world', "In a bank, hospital, factory, or retail chain, this same pattern prevents teams from trusting examples that do not match the production code."],
-  ['quiz', [{q:"What happens if you change XGBoost max_depth from 5 to 1?",a:0,opts:[{t:"Each tree becomes a stump, so the model is simpler and may underfit.",e:"Correct. Shallow trees capture fewer interactions."},{t:"Each tree memorizes more training rows.",e:"That happens with deeper trees, not shallower ones."},{t:"The number of classes changes to one.",e:"max_depth does not change classes."},{t:"The model cannot output probabilities.",e:"The objective still outputs probabilities."}]}]],
+  ['quiz', [{q:"What happens if you change XGBoost max_depth from 5 to 1?",a:0,opts:[{t:"Each tree becomes a stump, so the model is simpler and may underfit.",e:"Correct. Shallow trees capture fewer interactions."},{t:"Each tree memorizes more training rows.",e:"That happens with deeper trees, not shallower ones."},{t:"The number of classes changes to one.",e:"max_depth does not change classes."},{t:"The model cannot output probabilities.",e:"The objective still outputs probabilities."}]},
+    {q:'Concept check. Why should you test a model on data it did not train on?',a:2,opts:[
+      {t:'Because training data is always stored in a different file format',e:'File format is not the reason. The issue is whether the model generalizes beyond rows it already saw.'},
+      {t:'Because unseen data makes the model train faster',e:'Validation does not speed up training. It measures whether training learned a useful pattern.'},
+      {t:'Because training accuracy can be overly optimistic when the model memorizes patterns',e:'Correct. Unseen validation or test data reveals whether the model learned general rules.'},
+      {t:'Because test data changes the learned weights after training',e:'A proper test set should not update weights. It is only used for evaluation.'},
+    ]},
+    {q:'Prediction check. If validation accuracy is much lower than training accuracy, what should you inspect first?',a:0,opts:[
+      {t:'Overfitting, leakage, and whether the validation split matches the real task',e:'Correct. A large gap means the model may not generalize, or the evaluation setup may be flawed.'},
+      {t:'Only the color palette in the dashboard',e:'Visual design matters, but it does not explain a train-validation performance gap.'},
+      {t:'Whether Python printed enough decimal places',e:'Formatting can hide tiny differences, but it does not cause a large accuracy gap.'},
+      {t:'Whether the model file name is short enough',e:'File names do not explain model generalization problems.'},
+    ]},
+    {q:'What would you change? A validation score looks too good because StandardScaler was fit before cross-validation. Which code change fixes the leakage?',a:1,opts:[
+      {t:'Fit StandardScaler once on the full dataset before the fold loop',e:'That is the problem. The validation fold would influence the mean and standard deviation used for training.'},
+      {t:'Inside each fold, fit StandardScaler only on X_train, then transform X_train and X_val with that scaler',e:'Correct. The validation fold stays unseen, so the score is a fairer estimate of generalisation.'},
+      {t:'Fit StandardScaler separately on X_train and X_val inside each fold',e:'That also leaks information. Validation data would get its own statistics, which the model would not have at deployment time.'},
+      {t:'Remove cross-validation and report training accuracy only',e:'That hides the problem instead of fixing it. Training accuracy cannot measure generalisation.'},
+    ]},
+    {q:'Trace the output. What does this snippet print? scores=[0.72,0.68,0.60]; total=sum(scores); print([round(s/total,2) for s in scores])',a:2,opts:[
+      {t:'[0.72, 0.68, 0.60]',e:'Those are the raw scores. The code divides each score by the total, so the values must change.'},
+      {t:'[1.00, 1.00, 1.00]',e:'Dividing by the total does not make each item one. It makes the whole list sum to one.'},
+      {t:'[0.36, 0.34, 0.30]',e:'Correct. The total is 2.00, so the normalised values are 0.72/2, 0.68/2, and 0.60/2.'},
+      {t:'[0.33, 0.33, 0.33]',e:'That would be a uniform distribution. The original scores are not equal, so the normalised values are not equal.'},
+    ]}]],
 );
 window.BLOCKS[8].push(
   ['h2', "Exact source code - Neural Network (MLP)"],
@@ -898,7 +970,31 @@ mlp.fit(X_train_ext, y_train)
 # Output changes: first layer receives 4 inputs instead of 2`],
   ['callout', 'info', 'What this tells you', '- Real code uses the same names you see in src/.\n- Real outputs anchor the lesson in training data, not guesses.\n- Changing arguments changes shapes, scores, speed, or validation behavior.'],
   ['callout', 'analogy', 'Real world', "In a bank, hospital, factory, or retail chain, this same pattern prevents teams from trusting examples that do not match the production code."],
-  ['quiz', [{q:"What happens if you remove StandardScaler from the MLP pipeline?",a:1,opts:[{t:"Training becomes more stable because raw values are preserved.",e:"Raw magnitudes usually make neural training less stable."},{t:"The optimizer sees huge feature-scale differences and convergence becomes slower or worse.",e:"Correct. MLP training is scale-sensitive."},{t:"The hidden layers automatically normalize inputs.",e:"MLPClassifier does not normalize features automatically."},{t:"Only XGBoost is affected.",e:"The MLP is directly affected."}]}]],
+  ['quiz', [{q:"What happens if you remove StandardScaler from the MLP pipeline?",a:1,opts:[{t:"Training becomes more stable because raw values are preserved.",e:"Raw magnitudes usually make neural training less stable."},{t:"The optimizer sees huge feature-scale differences and convergence becomes slower or worse.",e:"Correct. MLP training is scale-sensitive."},{t:"The hidden layers automatically normalize inputs.",e:"MLPClassifier does not normalize features automatically."},{t:"Only XGBoost is affected.",e:"The MLP is directly affected."}]},
+    {q:'Concept check. Why should you test a model on data it did not train on?',a:2,opts:[
+      {t:'Because training data is always stored in a different file format',e:'File format is not the reason. The issue is whether the model generalizes beyond rows it already saw.'},
+      {t:'Because unseen data makes the model train faster',e:'Validation does not speed up training. It measures whether training learned a useful pattern.'},
+      {t:'Because training accuracy can be overly optimistic when the model memorizes patterns',e:'Correct. Unseen validation or test data reveals whether the model learned general rules.'},
+      {t:'Because test data changes the learned weights after training',e:'A proper test set should not update weights. It is only used for evaluation.'},
+    ]},
+    {q:'Prediction check. If validation accuracy is much lower than training accuracy, what should you inspect first?',a:0,opts:[
+      {t:'Overfitting, leakage, and whether the validation split matches the real task',e:'Correct. A large gap means the model may not generalize, or the evaluation setup may be flawed.'},
+      {t:'Only the color palette in the dashboard',e:'Visual design matters, but it does not explain a train-validation performance gap.'},
+      {t:'Whether Python printed enough decimal places',e:'Formatting can hide tiny differences, but it does not cause a large accuracy gap.'},
+      {t:'Whether the model file name is short enough',e:'File names do not explain model generalization problems.'},
+    ]},
+    {q:'What would you change? A validation score looks too good because StandardScaler was fit before cross-validation. Which code change fixes the leakage?',a:1,opts:[
+      {t:'Fit StandardScaler once on the full dataset before the fold loop',e:'That is the problem. The validation fold would influence the mean and standard deviation used for training.'},
+      {t:'Inside each fold, fit StandardScaler only on X_train, then transform X_train and X_val with that scaler',e:'Correct. The validation fold stays unseen, so the score is a fairer estimate of generalisation.'},
+      {t:'Fit StandardScaler separately on X_train and X_val inside each fold',e:'That also leaks information. Validation data would get its own statistics, which the model would not have at deployment time.'},
+      {t:'Remove cross-validation and report training accuracy only',e:'That hides the problem instead of fixing it. Training accuracy cannot measure generalisation.'},
+    ]},
+    {q:'Trace the output. What does this snippet print? scores=[0.72,0.68,0.60]; total=sum(scores); print([round(s/total,2) for s in scores])',a:2,opts:[
+      {t:'[0.72, 0.68, 0.60]',e:'Those are the raw scores. The code divides each score by the total, so the values must change.'},
+      {t:'[1.00, 1.00, 1.00]',e:'Dividing by the total does not make each item one. It makes the whole list sum to one.'},
+      {t:'[0.36, 0.34, 0.30]',e:'Correct. The total is 2.00, so the normalised values are 0.72/2, 0.68/2, and 0.60/2.'},
+      {t:'[0.33, 0.33, 0.33]',e:'That would be a uniform distribution. The original scores are not equal, so the normalised values are not equal.'},
+    ]}]],
 );
 window.BLOCKS[9].push(
   ['h2', "Exact source code - Ensemble Methods"],
@@ -1031,7 +1127,31 @@ results = evaluate_models({'vote': voting, 'stack': stacking}, X, y)
 # Output changes: each ensemble gets its own CV mean and std`],
   ['callout', 'info', 'What this tells you', '- Real code uses the same names you see in src/.\n- Real outputs anchor the lesson in training data, not guesses.\n- Changing arguments changes shapes, scores, speed, or validation behavior.'],
   ['callout', 'analogy', 'Real world', "In a bank, hospital, factory, or retail chain, this same pattern prevents teams from trusting examples that do not match the production code."],
-  ['quiz', [{q:"What happens if you change VotingClassifier voting from soft to hard?",a:2,opts:[{t:"It averages probability vectors more carefully.",e:"That describes soft voting."},{t:"It uses the stacking meta-model instead.",e:"Voting and stacking are different estimators."},{t:"It counts only each model's top class vote, losing confidence information.",e:"Correct. Hard voting ignores probability strength."},{t:"It prevents base models from being trained.",e:"Base models are still trained."}]}]],
+  ['quiz', [{q:"What happens if you change VotingClassifier voting from soft to hard?",a:2,opts:[{t:"It averages probability vectors more carefully.",e:"That describes soft voting."},{t:"It uses the stacking meta-model instead.",e:"Voting and stacking are different estimators."},{t:"It counts only each model's top class vote, losing confidence information.",e:"Correct. Hard voting ignores probability strength."},{t:"It prevents base models from being trained.",e:"Base models are still trained."}]},
+    {q:'Concept check. Why should you test a model on data it did not train on?',a:2,opts:[
+      {t:'Because training data is always stored in a different file format',e:'File format is not the reason. The issue is whether the model generalizes beyond rows it already saw.'},
+      {t:'Because unseen data makes the model train faster',e:'Validation does not speed up training. It measures whether training learned a useful pattern.'},
+      {t:'Because training accuracy can be overly optimistic when the model memorizes patterns',e:'Correct. Unseen validation or test data reveals whether the model learned general rules.'},
+      {t:'Because test data changes the learned weights after training',e:'A proper test set should not update weights. It is only used for evaluation.'},
+    ]},
+    {q:'Prediction check. If validation accuracy is much lower than training accuracy, what should you inspect first?',a:0,opts:[
+      {t:'Overfitting, leakage, and whether the validation split matches the real task',e:'Correct. A large gap means the model may not generalize, or the evaluation setup may be flawed.'},
+      {t:'Only the color palette in the dashboard',e:'Visual design matters, but it does not explain a train-validation performance gap.'},
+      {t:'Whether Python printed enough decimal places',e:'Formatting can hide tiny differences, but it does not cause a large accuracy gap.'},
+      {t:'Whether the model file name is short enough',e:'File names do not explain model generalization problems.'},
+    ]},
+    {q:'What would you change? A validation score looks too good because StandardScaler was fit before cross-validation. Which code change fixes the leakage?',a:1,opts:[
+      {t:'Fit StandardScaler once on the full dataset before the fold loop',e:'That is the problem. The validation fold would influence the mean and standard deviation used for training.'},
+      {t:'Inside each fold, fit StandardScaler only on X_train, then transform X_train and X_val with that scaler',e:'Correct. The validation fold stays unseen, so the score is a fairer estimate of generalisation.'},
+      {t:'Fit StandardScaler separately on X_train and X_val inside each fold',e:'That also leaks information. Validation data would get its own statistics, which the model would not have at deployment time.'},
+      {t:'Remove cross-validation and report training accuracy only',e:'That hides the problem instead of fixing it. Training accuracy cannot measure generalisation.'},
+    ]},
+    {q:'Trace the output. What does this snippet print? scores=[0.72,0.68,0.60]; total=sum(scores); print([round(s/total,2) for s in scores])',a:2,opts:[
+      {t:'[0.72, 0.68, 0.60]',e:'Those are the raw scores. The code divides each score by the total, so the values must change.'},
+      {t:'[1.00, 1.00, 1.00]',e:'Dividing by the total does not make each item one. It makes the whole list sum to one.'},
+      {t:'[0.36, 0.34, 0.30]',e:'Correct. The total is 2.00, so the normalised values are 0.72/2, 0.68/2, and 0.60/2.'},
+      {t:'[0.33, 0.33, 0.33]',e:'That would be a uniform distribution. The original scores are not equal, so the normalised values are not equal.'},
+    ]}]],
 );
 window.BLOCKS[10].push(
   ['h2', "Exact source code - Cross-Validation"],
@@ -1150,5 +1270,29 @@ skf = make_skf(random_state=7)
 # Output changes: fold membership changes reproducibly`],
   ['callout', 'info', 'What this tells you', '- Real code uses the same names you see in src/.\n- Real outputs anchor the lesson in training data, not guesses.\n- Changing arguments changes shapes, scores, speed, or validation behavior.'],
   ['callout', 'analogy', 'Real world', "In a bank, hospital, factory, or retail chain, this same pattern prevents teams from trusting examples that do not match the production code."],
-  ['quiz', [{q:"What happens if you change StratifiedKFold shuffle from True to False on ordered data?",a:0,opts:[{t:"Folds may become class-skewed if similar rows are grouped together.",e:"Correct. Shuffling protects against order artifacts."},{t:"The number of folds doubles automatically.",e:"shuffle does not change n_splits."},{t:"The scaler stops working.",e:"Scaler behavior is independent."},{t:"The test set is used for training.",e:"The test set is not involved."}]}]],
+  ['quiz', [{q:"What happens if you change StratifiedKFold shuffle from True to False on ordered data?",a:0,opts:[{t:"Folds may become class-skewed if similar rows are grouped together.",e:"Correct. Shuffling protects against order artifacts."},{t:"The number of folds doubles automatically.",e:"shuffle does not change n_splits."},{t:"The scaler stops working.",e:"Scaler behavior is independent."},{t:"The test set is used for training.",e:"The test set is not involved."}]},
+    {q:'Concept check. Why should you test a model on data it did not train on?',a:2,opts:[
+      {t:'Because training data is always stored in a different file format',e:'File format is not the reason. The issue is whether the model generalizes beyond rows it already saw.'},
+      {t:'Because unseen data makes the model train faster',e:'Validation does not speed up training. It measures whether training learned a useful pattern.'},
+      {t:'Because training accuracy can be overly optimistic when the model memorizes patterns',e:'Correct. Unseen validation or test data reveals whether the model learned general rules.'},
+      {t:'Because test data changes the learned weights after training',e:'A proper test set should not update weights. It is only used for evaluation.'},
+    ]},
+    {q:'Prediction check. If validation accuracy is much lower than training accuracy, what should you inspect first?',a:0,opts:[
+      {t:'Overfitting, leakage, and whether the validation split matches the real task',e:'Correct. A large gap means the model may not generalize, or the evaluation setup may be flawed.'},
+      {t:'Only the color palette in the dashboard',e:'Visual design matters, but it does not explain a train-validation performance gap.'},
+      {t:'Whether Python printed enough decimal places',e:'Formatting can hide tiny differences, but it does not cause a large accuracy gap.'},
+      {t:'Whether the model file name is short enough',e:'File names do not explain model generalization problems.'},
+    ]},
+    {q:'What would you change? A validation score looks too good because StandardScaler was fit before cross-validation. Which code change fixes the leakage?',a:1,opts:[
+      {t:'Fit StandardScaler once on the full dataset before the fold loop',e:'That is the problem. The validation fold would influence the mean and standard deviation used for training.'},
+      {t:'Inside each fold, fit StandardScaler only on X_train, then transform X_train and X_val with that scaler',e:'Correct. The validation fold stays unseen, so the score is a fairer estimate of generalisation.'},
+      {t:'Fit StandardScaler separately on X_train and X_val inside each fold',e:'That also leaks information. Validation data would get its own statistics, which the model would not have at deployment time.'},
+      {t:'Remove cross-validation and report training accuracy only',e:'That hides the problem instead of fixing it. Training accuracy cannot measure generalisation.'},
+    ]},
+    {q:'Trace the output. What does this snippet print? scores=[0.72,0.68,0.60]; total=sum(scores); print([round(s/total,2) for s in scores])',a:2,opts:[
+      {t:'[0.72, 0.68, 0.60]',e:'Those are the raw scores. The code divides each score by the total, so the values must change.'},
+      {t:'[1.00, 1.00, 1.00]',e:'Dividing by the total does not make each item one. It makes the whole list sum to one.'},
+      {t:'[0.36, 0.34, 0.30]',e:'Correct. The total is 2.00, so the normalised values are 0.72/2, 0.68/2, and 0.60/2.'},
+      {t:'[0.33, 0.33, 0.33]',e:'That would be a uniform distribution. The original scores are not equal, so the normalised values are not equal.'},
+    ]}]],
 );

@@ -9,6 +9,68 @@ function useRef(v){return _useRef(v);}
 function useCallback(f,d){return _useCallback(f,d);}
 function useMemo(f,d){return _useMemo(f,d);}
 
+/* ── persistent storage helpers ─────────────────────────────────── */
+function decodeStored(value,fallback){
+  if(value===undefined||value===null) return fallback;
+  if(typeof value!=='string') return value;
+  try{return JSON.parse(value);}catch(e){return value;}
+}
+function storageRead(key,fallback,onOk,onErr){
+  try{
+    var db=window.storage||window.localStorage;
+    if(!db) throw new Error('storage unavailable');
+    if(!db.getItem&&!db.get) throw new Error('storage read unavailable');
+    var result=db.getItem?db.getItem(key):db.get(key);
+    Promise.resolve(result).then(function(value){
+      onOk(decodeStored(value,fallback));
+    }).catch(function(err){if(onErr)onErr(err);});
+  }catch(err){if(onErr)onErr(err);}
+}
+function storageWrite(key,value,onOk,onErr){
+  try{
+    var db=window.storage||window.localStorage;
+    if(!db) throw new Error('storage unavailable');
+    var encoded=JSON.stringify(value);
+    if(!db.setItem&&!db.set) throw new Error('storage write unavailable');
+    var result=db.setItem?db.setItem(key,encoded):db.set(key,encoded);
+    Promise.resolve(result).then(function(){if(onOk)onOk();}).catch(function(err){if(onErr)onErr(err);});
+  }catch(err){if(onErr)onErr(err);}
+}
+function storageRemove(key,onOk,onErr){
+  try{
+    var db=window.storage||window.localStorage;
+    if(!db) throw new Error('storage unavailable');
+    if(!db.removeItem&&!db.remove&&!db.set) throw new Error('storage remove unavailable');
+    var result=db.removeItem?db.removeItem(key):(db.remove?db.remove(key):db.set(key,null));
+    Promise.resolve(result).then(function(){if(onOk)onOk();}).catch(function(err){if(onErr)onErr(err);});
+  }catch(err){if(onErr)onErr(err);}
+}
+function storageReadSync(key,fallback){
+  try{
+    var db=window.storage||window.localStorage;
+    if(!db||!db.getItem) return fallback;
+    return decodeStored(db.getItem(key),fallback);
+  }catch(e){return fallback;}
+}
+function storageReadPromise(key,fallback){
+  return new Promise(function(resolve){
+    storageRead(key,fallback,resolve,function(){resolve(fallback);});
+  });
+}
+function lessonWordsFromBlocks(blocks){
+  var text=[];
+  function collect(v){
+    if(typeof v==='string') text.push(v);
+    else if(Array.isArray(v)) v.forEach(collect);
+    else if(v&&typeof v==='object') Object.keys(v).forEach(function(k){collect(v[k]);});
+  }
+  collect(blocks||[]);
+  return text.join(' ').replace(/[^\w\s]/g,' ').trim().split(/\s+/).filter(Boolean).length;
+}
+function shortLabel(label){
+  return label&&label.length>25?label.slice(0,24)+'…':label;
+}
+
 /* ── UI Primitives ──────────────────────────────────────────────── */
 function CB({filename,code}){
   var [cp,setCp]=useState(false);
@@ -162,7 +224,7 @@ function AttentionNeighbours(){
   var [bw,setBw]=useState(2);
   var [frozen,setFrozen]=useState(false);
   var [query,setQuery]=useState(function(){return (window.__livePredictorQuery&&window.__livePredictorQuery.raw)||[6000,1200];});
-  var dataset=useMemo(function(){var d=window.generateData();var sc=new window.Scaler().fit(d.X);return {X:d.X.slice(0,30),y:d.y.slice(0,30),sc:sc,Xsc:sc.transform(d.X.slice(0,30))};},[]);
+  var dataset=useMemo(function(){var d=window._cachedData||window.generateData();var sc=new window.Scaler().fit(d.X);return {X:d.X.slice(0,30),y:d.y.slice(0,30),sc:sc,Xsc:sc.transform(d.X.slice(0,30))};},[]);
   useEffect(function(){var t=setInterval(function(){if(!frozen&&window.__livePredictorQuery&&window.__livePredictorQuery.raw)setQuery(window.__livePredictorQuery.raw);},300);return function(){clearInterval(t);};},[frozen]);
   var qi=useMemo(function(){return dataset.sc.transformOne(query);},[dataset,query]);
   var weights=useMemo(function(){return window.attnWeights(dataset.Xsc,qi,parseFloat(bw));},[dataset,qi,bw]);
@@ -201,15 +263,177 @@ function VizBlock({name,props}){
   if(!C)return <Callout type="warning" title="Missing visualization">Unknown visualization: {name}</Callout>;
   return <C {...(props||{})}/>;
 }
+function LessonNotes({lessonId,noteId,title,onNoteSaved,onStorageError}){
+  var [open,setOpen]=useState(false);
+  var [note,setNote]=useState('');
+  var [loaded,setLoaded]=useState(false);
+  var [saved,setSaved]=useState(false);
+  var [undoValue,setUndoValue]=useState(null);
+  var saveTimer=useRef(null);
+  var dirty=useRef(false);
+  var persisted=useRef('');
+  var key='note:'+noteId;
+  function markSaved(){
+    setSaved(true);
+    setTimeout(function(){setSaved(false);},2000);
+  }
+  function updateNoteIndex(text){
+    storageRead('notes:index',[],function(list){
+      if(!Array.isArray(list)) list=[];
+      var has=list.indexOf(lessonId)!==-1;
+      var next=list.slice();
+      if(text.trim()&&!has) next.push(lessonId);
+      if(text.trim()){
+        storageWrite('notes:index',next,function(){if(onNoteSaved)onNoteSaved(next);},onStorageError);
+        return;
+      }
+      storageRead('notes:keys',[],function(keys){
+        if(!Array.isArray(keys)) keys=[];
+        var prefix='note:'+lessonId+':';
+        var related=keys.filter(function(k){return k.indexOf(prefix)===0&&k!==key;});
+        Promise.all(related.map(function(k){return storageReadPromise(k,'');})).then(function(values){
+          var stillHasNote=values.some(function(v){return typeof v==='string'&&v.trim();});
+          if(!stillHasNote&&has) next=next.filter(function(id){return id!==lessonId;});
+          storageWrite('notes:index',next,function(){if(onNoteSaved)onNoteSaved(next);},onStorageError);
+        });
+      },onStorageError);
+    },onStorageError);
+  }
+  function rememberNoteKey(){
+    storageRead('notes:keys',[],function(keys){
+      if(!Array.isArray(keys)) keys=[];
+      if(keys.indexOf(key)===-1) keys=keys.concat([key]);
+      storageWrite('notes:keys',keys,null,onStorageError);
+    },onStorageError);
+  }
+  function saveNow(text){
+    var previous=persisted.current;
+    storageWrite(key,text,function(){
+      dirty.current=false;
+      if(text!==previous) setUndoValue(previous);
+      persisted.current=text;
+      if(text.trim()) rememberNoteKey();
+      updateNoteIndex(text);
+      markSaved();
+    },onStorageError);
+  }
+  function clearNote(){
+    var previous=persisted.current;
+    storageWrite(key,'',function(){
+      setNote('');
+      persisted.current='';
+      dirty.current=false;
+      if(previous!=='') setUndoValue(previous);
+      updateNoteIndex('');
+      markSaved();
+    },onStorageError);
+  }
+  function undoSave(){
+    if(undoValue===null) return;
+    var restored=undoValue;
+    storageWrite(key,restored,function(){
+      setNote(restored);
+      persisted.current=restored;
+      dirty.current=false;
+      updateNoteIndex(restored);
+      setUndoValue(null);
+      markSaved();
+    },onStorageError);
+  }
+  useEffect(function(){
+    setLoaded(false);
+    storageRead(key,'',function(value){
+      var text=typeof value==='string'?value:'';
+      setNote(text);
+      setOpen(!!text.trim());
+      persisted.current=text;
+      setUndoValue(null);
+      dirty.current=false;
+      setLoaded(true);
+    },function(err){setLoaded(true);onStorageError(err);});
+    return function(){if(saveTimer.current)clearTimeout(saveTimer.current);};
+  },[key]);
+  useEffect(function(){
+    if(!loaded||!dirty.current) return;
+    if(saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current=setTimeout(function(){saveNow(note);},2000);
+    return function(){if(saveTimer.current)clearTimeout(saveTimer.current);};
+  },[note,loaded]);
+  return(
+    <section style={{marginTop:42,border:'1px solid #e2e8f0',borderRadius:8,background:'white',overflow:'hidden'}}>
+      <button onClick={function(){setOpen(!open);}}
+        style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'13px 16px',border:'none',background:'#f8fafc',cursor:'pointer',fontFamily:'inherit'}}>
+        <span style={{fontWeight:800,color:'#1e293b'}}>{title||'My Notes'}</span>
+        <span style={{fontSize:13,color:'#64748b'}}>{saved?'📝 note saved':(open?'Hide':'Show')}</span>
+      </button>
+      {open&&(
+        <div style={{padding:16}}>
+          <textarea value={note} onChange={function(e){dirty.current=true;setNote(e.target.value);}}
+            placeholder="Write your own explanation, questions, or reminders for this lesson..."
+            style={{width:'100%',minHeight:150,boxSizing:'border-box',resize:'vertical',border:'1px solid #cbd5e1',borderRadius:8,padding:12,fontSize:15,lineHeight:1.6,fontFamily:'inherit'}}/>
+          <div style={{display:'flex',alignItems:'center',gap:10,marginTop:10}}>
+            <button onClick={function(){saveNow(note);}}
+              style={{background:'#2563eb',color:'white',border:'none',borderRadius:7,padding:'9px 14px',fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+              Save note
+            </button>
+            {undoValue!==null&&(
+              <button onClick={undoSave}
+                style={{background:'white',color:'#b45309',border:'1px solid #f59e0b',borderRadius:7,padding:'9px 14px',fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+                Undo save
+              </button>
+            )}
+            <button onClick={clearNote}
+              style={{background:'white',color:'#7f1d1d',border:'1px solid #fca5a5',borderRadius:7,padding:'9px 14px',fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+              Clear note
+            </button>
+            {saved&&<span style={{fontSize:13,color:'#166534',fontWeight:700}}>📝 note saved</span>}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 /* ── Lesson page renderer ───────────────────────────────────────── */
-function LessonPage({idx}){
+function LessonPage({idx,lessonId,isBookmarked,onToggleBookmark,onNoteSaved,onStorageError,storageWarning}){
   var blocks=(window.BLOCKS&&window.BLOCKS[idx])||[];
+  var readMins=Math.max(1,Math.ceil(lessonWordsFromBlocks(blocks)/200));
+  var conceptNotesShown=0;
+  if(!blocks.length){
+    return(
+      <div>
+        <h1 style={{fontSize:32,fontWeight:800,color:'#0f172a',margin:'0 0 12px'}}>{(window.LESSON_TITLES&&window.LESSON_TITLES[idx])||'Lesson '+idx}</h1>
+        <div style={{background:'white',border:'1px solid #e2e8f0',borderRadius:10,padding:'24px 26px',color:'#475569',lineHeight:1.8}}>
+          <div style={{fontSize:22,fontWeight:800,color:'#1e293b',marginBottom:6}}>Coming soon</div>
+          This lesson is coming soon. In the meantime, explore the existing lessons from the sidebar.
+        </div>
+      </div>
+    );
+  }
   return(
     <div>
-      <h1 style={{fontSize:32,fontWeight:800,color:'#0f172a',marginBottom:18}}>{(window.LESSON_TITLES&&window.LESSON_TITLES[idx])||'Lesson '+idx}</h1>
+      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:18,marginBottom:18}}>
+        <div>
+          <h1 style={{fontSize:32,fontWeight:800,color:'#0f172a',margin:'0 0 8px'}}>{(window.LESSON_TITLES&&window.LESSON_TITLES[idx])||'Lesson '+idx}</h1>
+          <div style={{fontSize:14,color:'#64748b'}}>📖 ~{readMins} min read</div>
+        </div>
+        <button onClick={onToggleBookmark} title={isBookmarked?'Remove bookmark':'Bookmark this lesson'}
+          style={{border:'1px solid '+(isBookmarked?'#f59e0b':'#cbd5e1'),background:isBookmarked?'#fffbeb':'white',color:isBookmarked?'#b45309':'#334155',borderRadius:8,padding:'9px 12px',fontSize:18,fontWeight:800,cursor:'pointer'}}>
+          {isBookmarked?'🔖✓':'🔖'}
+        </button>
+      </div>
+      {storageWarning&&<Callout type="warning" title="Storage unavailable">Notes and bookmarks cannot be saved right now.</Callout>}
       {blocks.map(function(b,i){
+        var rendered=null;
         if(b[0]==='p') return <p key={i} style={{color:'#475569',lineHeight:1.85,fontSize:16,marginBottom:14}}>{b[1]}</p>;
-        if(b[0]==='h2') return <h2 key={i} style={{fontSize:22,fontWeight:700,color:'#1e293b',marginTop:36,marginBottom:14,paddingBottom:8,borderBottom:'1px solid #e2e8f0'}}>{b[1]}</h2>;
+        if(b[0]==='h2'){
+          conceptNotesShown++;
+          rendered=<h2 key={i} style={{fontSize:22,fontWeight:700,color:'#1e293b',marginTop:36,marginBottom:14,paddingBottom:8,borderBottom:'1px solid #e2e8f0'}}>{b[1]}</h2>;
+          if(conceptNotesShown===2||conceptNotesShown===5){
+            return <React.Fragment key={i}>{rendered}<LessonNotes lessonId={lessonId} noteId={lessonId+':concept:'+conceptNotesShown} title="My Notes for this concept" onNoteSaved={onNoteSaved} onStorageError={onStorageError}/></React.Fragment>;
+          }
+          return rendered;
+        }
         if(b[0]==='code') return <CB key={i} filename={b[1]} code={b[2]}/>;
         if(b[0]==='math') return <MathB key={i}>{b[1]}</MathB>;
         if(b[0]==='callout') return <Callout key={i} type={b[1]} title={b[2]}>{b[3]}</Callout>;
@@ -219,6 +443,7 @@ function LessonPage({idx}){
         if(b[0]==='viz') return <VizBlock key={i} name={b[1]} props={b[2]}/>;
         return null;
       })}
+      <LessonNotes lessonId={lessonId} noteId={lessonId+':summary'} title="My Notes" onNoteSaved={onNoteSaved} onStorageError={onStorageError}/>
     </div>
   );
 }
@@ -251,7 +476,7 @@ function LivePredictor(){
   var [models,setModels]=useState(null);
 
   var dataset=useMemo(function(){
-    var d=window.generateData();
+    var d=window._cachedData||window.generateData();
     var sc=new window.Scaler().fit(d.X);
     return {X:d.X,y:d.y,sc:sc,Xsc:sc.transform(d.X)};
   },[]);
@@ -396,7 +621,7 @@ function GradientDescentViz(){
   var timerRef=useRef(null);
 
   var dataset=useMemo(function(){
-    var d=window.generateData();
+    var d=window._cachedData||window.generateData();
     var sc=new window.Scaler().fit(d.X);
     var Xsc=sc.transform(d.X);
     var yb=d.y.map(function(yi){return yi===0?1:0;}); /* Residential vs rest */
@@ -501,7 +726,7 @@ function AttentionHeatmapViz(){
   var [qSqft,setQSqft]=useState(1500);
 
   var dataset=useMemo(function(){
-    var d=window.generateData();
+    var d=window._cachedData||window.generateData();
     var sc=new window.Scaler().fit(d.X);
     return {X:d.X,y:d.y,sc:sc,Xsc:sc.transform(d.X)};
   },[]);
@@ -606,7 +831,7 @@ function DecisionBoundaryViz(){
   var [busy,setBusy]=useState(false);
 
   var dataset=useMemo(function(){
-    var d=window.generateData();
+    var d=window._cachedData||window.generateData();
     var sc=new window.Scaler().fit(d.X);
     return {X:d.X,y:d.y,sc:sc,Xsc:sc.transform(d.X)};
   },[]);
@@ -711,14 +936,33 @@ function DecisionBoundaryViz(){
 }
 
 /* ── Final Exam ─────────────────────────────────────────────────── */
-function FinalExam(){
+function FinalExam({onExamScore,onStorageError}){
   var [answers,setAnswers]=useState({});
   var [submitted,setSubmitted]=useState(false);
+  var [shareCopied,setShareCopied]=useState(false);
   var n=window.FQ.length;
   var answered=Object.keys(answers).length;
   var score=window.FQ.reduce(function(s,q,i){return s+(answers[i]===q.a?1:0);},0);
   var pct=Math.round(score/n*100);
   var pass=pct>=70;
+  useEffect(function(){
+    if(submitted){
+      var main=document.querySelector('main');
+      if(main&&main.scrollTo) main.scrollTo({top:0,behavior:'smooth'});
+      else window.scrollTo({top:0,behavior:'smooth'});
+    }
+  },[submitted]);
+  function shareResults(){
+    var text='I scored '+score+'/'+n+' on the EnergyTypeNet ML exam';
+    try{
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(function(){
+          setShareCopied(true);
+          setTimeout(function(){setShareCopied(false);},2000);
+        });
+      }
+    }catch(e){}
+  }
 
   if(submitted){
     return(
@@ -745,9 +989,14 @@ function FinalExam(){
             </div>
           );
         })}
-        <button onClick={function(){setAnswers({});setSubmitted(false);}} style={{marginTop:12,padding:'9px 22px',borderRadius:9,background:'#2563eb',color:'white',border:'none',fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
-          ↺ Retake
-        </button>
+        <div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:12}}>
+          <button onClick={function(){setAnswers({});setSubmitted(false);}} style={{padding:'9px 22px',borderRadius:9,background:'#2563eb',color:'white',border:'none',fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
+            ↺ Retake
+          </button>
+          <button onClick={shareResults} style={{padding:'9px 22px',borderRadius:9,background:'white',color:'#2563eb',border:'1px solid #2563eb',fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
+            {shareCopied?'✓ Copied!':'Share results'}
+          </button>
+        </div>
       </div>
     );
   }
@@ -755,7 +1004,7 @@ function FinalExam(){
   return(
     <div>
       <h1 style={{fontSize:24,fontWeight:800,marginBottom:6}}>🎓 Final Exam</h1>
-      <p style={{color:'#64748b',fontSize:13,marginBottom:8}}>25 questions across all lessons. Pass mark: 70% (18/25). Answered: {answered}/{n}</p>
+      <p style={{color:'#64748b',fontSize:13,marginBottom:8}}>40 questions across all lessons. Pass mark: 70% (28/40). Answered: {answered}/{n}</p>
       <div style={{height:5,background:'#e2e8f0',borderRadius:3,marginBottom:16,overflow:'hidden'}}>
         <div style={{height:'100%',width:(answered/n*100)+'%',background:'#3b82f6',borderRadius:3,transition:'width .3s'}}/>
       </div>
@@ -778,10 +1027,90 @@ function FinalExam(){
           </div>
         );
       })}
-      <button onClick={function(){if(answered===n)setSubmitted(true);}} disabled={answered<n}
+      <div style={{marginTop:12,marginBottom:8,padding:'10px 12px',background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:8,color:'#1e40af',fontSize:14,fontWeight:700}}>
+        You have answered {answered} of {n} questions. {n-answered} more to go.
+      </div>
+      <button onClick={function(){
+        if(answered===n){
+          var result={score:score,total:n,pct:pct,passed:pass,taken_at:new Date().toISOString()};
+          storageWrite('exam_score',result,function(){if(onExamScore)onExamScore(result);},onStorageError);
+          setSubmitted(true);
+        }
+      }} disabled={answered<n}
         style={{padding:'10px 24px',borderRadius:9,background:answered===n?'#2563eb':'#cbd5e1',color:answered===n?'white':'#94a3b8',border:'none',fontSize:14,fontWeight:700,cursor:answered===n?'pointer':'not-allowed',fontFamily:'inherit',marginTop:8}}>
         {answered<n?('Answer '+(n-answered)+' more to submit'):('Submit ('+answered+'/'+n+' answered)')}
       </button>
+    </div>
+  );
+}
+
+/* ── Glossary ───────────────────────────────────────────────────── */
+function GlossaryPage({lessonId,isBookmarked,onToggleBookmark,onNoteSaved,onStorageError,storageWarning}){
+  var [q,setQ]=useState('');
+  var readMins=Math.max(1,Math.ceil(lessonWordsFromBlocks(window.BLOCKS[33]||[])/200));
+  var entries=useMemo(function(){
+    var blocks=window.BLOCKS[33]||[];
+    var out=[];
+    for(var i=0;i<blocks.length;i++){
+      if(blocks[i][0]==='h2'){
+        out.push({
+          term:blocks[i][1],
+          definition:(blocks[i+1]&&blocks[i+1][0]==='p')?blocks[i+1][1]:'',
+          where:(blocks[i+2]&&blocks[i+2][0]==='p')?blocks[i+2][1]:'',
+          analogy:(blocks[i+3]&&blocks[i+3][0]==='callout')?blocks[i+3][3]:'',
+        });
+      }
+    }
+    return out;
+  },[]);
+  var query=q.trim().toLowerCase();
+  var shown=entries.filter(function(e){
+    if(!query) return true;
+    return (e.term+' '+e.definition+' '+e.where+' '+e.analogy).toLowerCase().indexOf(query)!==-1;
+  });
+  return(
+    <div>
+      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:18,marginBottom:18}}>
+        <div>
+          <h1 style={{fontSize:34,fontWeight:800,color:'#0f172a',margin:'0 0 8px'}}>Glossary</h1>
+          <div style={{fontSize:14,color:'#64748b'}}>📖 ~{readMins} min read</div>
+        </div>
+        <button onClick={onToggleBookmark} title={isBookmarked?'Remove bookmark':'Bookmark this lesson'}
+          style={{border:'1px solid '+(isBookmarked?'#f59e0b':'#cbd5e1'),background:isBookmarked?'#fffbeb':'white',color:isBookmarked?'#b45309':'#334155',borderRadius:8,padding:'9px 12px',fontSize:18,fontWeight:800,cursor:'pointer'}}>
+          {isBookmarked?'🔖✓':'🔖'}
+        </button>
+      </div>
+      {storageWarning&&<Callout type="warning" title="Storage unavailable">Notes and bookmarks cannot be saved right now.</Callout>}
+      <p style={{fontSize:16,color:'#64748b',lineHeight:1.8,marginBottom:18}}>
+        Search every technical term used across the GradCurve lessons.
+      </p>
+      <input
+        value={q}
+        onChange={function(e){setQ(e.target.value);}}
+        placeholder="Search terms, lessons, or analogies..."
+        style={{width:'100%',boxSizing:'border-box',padding:'14px 16px',border:'1px solid #cbd5e1',borderRadius:8,fontSize:16,fontFamily:'inherit',marginBottom:10,background:'white'}}
+      />
+      <div style={{fontSize:13,color:'#64748b',marginBottom:22}}>
+        Showing {shown.length} of {entries.length} terms
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:14}}>
+        {shown.map(function(e){
+          return(
+            <section key={e.term} style={{background:'white',border:'1px solid #e2e8f0',borderRadius:8,padding:'18px 18px 16px'}}>
+              <h2 style={{fontSize:20,fontWeight:800,color:'#0f172a',margin:'0 0 8px'}}>{e.term}</h2>
+              <p style={{fontSize:15,color:'#334155',lineHeight:1.7,margin:'0 0 8px'}}>{e.definition}</p>
+              <p style={{fontSize:14,color:'#64748b',lineHeight:1.65,margin:'0 0 12px'}}>{e.where}</p>
+              <Callout type="analogy" title="Simple analogy">{e.analogy}</Callout>
+            </section>
+          );
+        })}
+      </div>
+      {!shown.length&&(
+        <div style={{background:'#fff7ed',border:'1px solid #fed7aa',borderRadius:8,padding:18,color:'#9a3412'}}>
+          No terms matched that search.
+        </div>
+      )}
+      <LessonNotes lessonId={lessonId} noteId={lessonId+':summary'} title="My Notes" onNoteSaved={onNoteSaved} onStorageError={onStorageError}/>
     </div>
   );
 }
@@ -790,6 +1119,7 @@ function FinalExam(){
 var NAV=[
   {id:'home',     label:'Home',                              g:'overview'},
   {id:'story',    label:'How I Built This Project',          g:'overview'},
+  {id:'glossary', label:'📖 Glossary',                       g:'overview'},
 
   {id:'tour',     label:'1 · Codebase Tour',                 g:'start'},
 
@@ -827,12 +1157,14 @@ var NAV=[
   {id:'streamlit', label:'26 · Streamlit',                   g:'prod'},
   {id:'ci',       label:'27 · GitHub Actions',               g:'prod'},
   {id:'automl',   label:'28 · AutoML',                       g:'prod'},
+  {id:'testing',  label:'29 · Testing',                      g:'prod'},
+  {id:'deployment', label:'30 · Deployment',                 g:'prod'},
 
   {id:'predictor', label:'Live Predictor',                   g:'demos'},
   {id:'gd',       label:'Gradient Descent Demo',             g:'demos'},
   {id:'heatmap',  label:'Attention Heatmap',                 g:'demos'},
   {id:'boundary', label:'Decision Boundary Demo',            g:'demos'},
-  {id:'exam',     label:'Final Exam (25q)',                  g:'demos'},
+  {id:'exam',     label:'Final Exam (40q)',                  g:'demos'},
 ];
 var GINFO={
   overview:   {l:'Overview',              c:'#94a3b8'},
@@ -852,25 +1184,46 @@ var LESSON_IDX={
   xgb:7,mlp:8,ensemble:9,cv:10,metrics:11,db:12,mlflow:13,
   fastapi:14,docker:15,streamlit:16,ci:17,automl:18,tour:19,
   gdlesson:20,overfit:21,results:22,eda:23,featimportance:24,
-  interpretability:25,ensemble2:26,ceiling:27,hyperparams:28,story:30
+  interpretability:25,ensemble2:26,ceiling:27,hyperparams:28,story:30,
+  testing:31,deployment:32,glossary:33
 };
 
-function Sidebar({cur,onSelect,visited}){
+function Sidebar({cur,onSelect,visited,bookmarks,noteIds,onUndoBookmark,canUndoBookmark,onResetNotes,onExport,exportCopied,storageWarning}){
   var grouped={};
   NAV.forEach(function(l){if(!grouped[l.g])grouped[l.g]=[];grouped[l.g].push(l);});
   var lessonIds=Object.keys(LESSON_IDX).filter(function(id){return id!=='home';});
   var done=lessonIds.filter(function(id){return visited[id];}).length;
   var total=lessonIds.length;
+  var bookmarkItems=(bookmarks||[]).map(function(id){return NAV.find(function(l){return l.id===id;});}).filter(Boolean);
   return(
     <div style={{width:320,minWidth:320,background:'#0f172a',color:'#cbd5e1',display:'flex',flexDirection:'column',height:'100%',overflowY:'auto',flexShrink:0}}>
       <div style={{padding:'24px 20px 18px',borderBottom:'1px solid #1e293b'}}>
         <div style={{fontWeight:800,color:'white',fontSize:20,letterSpacing:'-0.02em'}}>GradCurve</div>
         <div style={{fontSize:12,color:'#64748b',marginTop:2}}>Powered by EnergyTypeNet</div>
-        <div style={{fontSize:14,color:'#475569',marginTop:4}}>29 lessons · 5 demos</div>
+        <div style={{fontSize:14,color:'#475569',marginTop:4}}>32 lessons · 5 demos</div>
         <div style={{marginTop:12,height:6,background:'#1e293b',borderRadius:3,overflow:'hidden'}}>
           <div style={{height:'100%',width:(done/total*100)+'%',background:'#3b82f6',borderRadius:3,transition:'width .4s'}}/>
         </div>
         <div style={{fontSize:13,color:'#475569',marginTop:5}}>{done}/{total} lessons visited</div>
+      </div>
+      <div style={{padding:'12px 14px',borderBottom:'1px solid #1e293b'}}>
+        <div style={{fontSize:12,fontWeight:800,color:'#fbbf24',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:8}}>Bookmarks</div>
+        {bookmarkItems.length?bookmarkItems.map(function(l){
+          return(
+            <button key={l.id} onClick={function(){onSelect(l.id);}}
+              style={{display:'block',width:'100%',textAlign:'left',border:'none',background:cur===l.id?'#1e3a8a':'transparent',color:cur===l.id?'white':'#bfdbfe',borderRadius:6,padding:'7px 8px',fontSize:13,cursor:'pointer',fontFamily:'inherit',marginBottom:2}}>
+              🔖 {l.label}
+            </button>
+          );
+        }):(
+          <div style={{fontSize:12,color:'#64748b',lineHeight:1.5}}>No bookmarks yet. Click 🔖 on any lesson.</div>
+        )}
+        {canUndoBookmark&&(
+          <button onClick={onUndoBookmark}
+            style={{marginTop:8,width:'100%',textAlign:'left',border:'1px solid #f59e0b',background:'#fffbeb',color:'#92400e',borderRadius:6,padding:'7px 8px',fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+            Undo bookmark change
+          </button>
+        )}
       </div>
       <nav style={{flex:1,padding:'12px 8px',display:'flex',flexDirection:'column',gap:12,overflowY:'auto'}}>
         {Object.entries(GINFO).map(function(entry){
@@ -883,11 +1236,13 @@ function Sidebar({cur,onSelect,visited}){
               {ls.map(function(l){
                 var active=cur===l.id;
                 var isDone=visited[l.id]&&!active;
+                var hasNote=noteIds&&noteIds.indexOf(l.id)!==-1;
                 return(
                   <button key={l.id} onClick={function(){onSelect(l.id);}}
                     style={{width:'100%',textAlign:'left',padding:'10px 12px',borderRadius:7,fontSize:15,border:'none',cursor:'pointer',marginBottom:2,background:active?'#2563eb':'transparent',color:active?'white':'#94a3b8',fontWeight:active?700:400,fontFamily:'inherit',display:'flex',alignItems:'center',gap:8}}>
                     {isDone&&<span style={{fontSize:10,color:'#4ade80',flexShrink:0}}>●</span>}
-                    {l.label}
+                    {hasNote&&<span title="Saved note" style={{fontSize:13,flexShrink:0}}>📝</span>}
+                    <span style={{flex:1}}>{l.label}</span>
                   </button>
                 );
               })}
@@ -895,7 +1250,22 @@ function Sidebar({cur,onSelect,visited}){
           );
         })}
       </nav>
-      <div style={{padding:'14px 20px',borderTop:'1px solid #1e293b',fontSize:13,color:'#334155'}}>Python 3.12 · scikit-learn</div>
+      <div style={{padding:'14px 20px',borderTop:'1px solid #1e293b',fontSize:12,color:'#64748b',lineHeight:1.6}}>
+        {storageWarning&&<div style={{color:'#fbbf24',fontWeight:800,marginBottom:8}}>⚠ Storage unavailable</div>}
+        <button onClick={onExport}
+          style={{width:'100%',border:'1px solid #334155',background:'#1e293b',color:exportCopied?'#4ade80':'#cbd5e1',borderRadius:7,padding:'8px 10px',fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit',marginBottom:10}}>
+          {exportCopied?'✓ Copied!':'Export progress'}
+        </button>
+        <button onClick={onResetNotes}
+          style={{width:'100%',border:'1px solid #7f1d1d',background:'#2b1111',color:'#fecaca',borderRadius:7,padding:'8px 10px',fontSize:12,fontWeight:800,cursor:'pointer',fontFamily:'inherit',marginBottom:10}}>
+          Reset all notes
+        </button>
+        Built by Bartosz Bryg · Python 3.12 · scikit-learn · XGBoost · FastAPI · Streamlit · MLflow
+        <a href="https://github.com/bartoszbryg/EnergyTypeNet" target="_blank" rel="noreferrer" title="GitHub repository"
+          style={{display:'inline-flex',alignItems:'center',gap:5,color:'#93c5fd',fontWeight:700,marginLeft:6,textDecoration:'none'}}>
+          <span aria-hidden="true">↗</span> GitHub
+        </a>
+      </div>
     </div>
   );
 }
@@ -904,9 +1274,43 @@ function Sidebar({cur,onSelect,visited}){
 function HomePage({onSelect}){
   var gbg={overview:'#f1f5f9',start:'#ecfeff',data:'#eff6ff',features:'#eef2ff',models:'#f5f3ff',training:'#fffbeb',eval:'#f0fdf4',ensembles:'#eef2ff',reliability:'#f0fdf4',prod:'#fff1f2',demos:'#fff7ed'};
   var gtc={overview:'#475569',start:'#155e75',data:'#1e40af',features:'#1d4ed8',models:'#5b21b6',training:'#92400e',eval:'#14532d',ensembles:'#3730a3',reliability:'#166534',prod:'#9f1239',demos:'#9a3412'};
+  var stats=[
+    ['6 Models','3 from scratch in NumPy'],
+    ['63-67%','Honest 2-feature accuracy'],
+    ['6 Notebooks','From EDA to synthetic experiments'],
+    ['Full Stack','API · Docker · MLflow · CI'],
+  ];
   return(
     <div>
       <h1 style={{fontSize:38,fontWeight:800,color:'#0f172a',marginBottom:12}}>GradCurve — ML Explained</h1>
+      <div style={{background:'#fffbeb',border:'1px solid #fcd34d',borderLeft:'5px solid #f59e0b',borderRadius:8,padding:'18px 22px',marginBottom:22}}>
+        <div style={{fontWeight:800,color:'#92400e',fontSize:17,marginBottom:8}}>🔬 What this project discovered</div>
+        <ul style={{margin:'0 0 0 20px',padding:0,color:'#78350f',lineHeight:1.8,fontSize:15}}>
+          <li>The accuracy ceiling is caused by class overlap, not sample size. More data won't help.</li>
+          <li>The extended feature set produced near-perfect CV scores — a red flag, not a win. Those features encode the label.</li>
+          <li>The custom AttentionClassifier, written entirely in NumPy, matches sklearn's LogisticRegression CV score.</li>
+        </ul>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12,margin:'22px 0 16px'}}>
+        {stats.map(function(s){
+          return(
+            <div key={s[0]} style={{background:'white',border:'1px solid #e2e8f0',borderRadius:8,padding:'16px 18px'}}>
+              <div style={{fontSize:24,fontWeight:800,color:'#0f172a',lineHeight:1.1}}>{s[0]}</div>
+              <div style={{fontSize:13,color:'#64748b',marginTop:5}}>{s[1]}</div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:28}}>
+        <button onClick={function(){onSelect('dataset');}}
+          style={{background:'#2563eb',color:'white',border:'1px solid #2563eb',borderRadius:8,padding:'11px 16px',fontSize:15,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+          Start from scratch → Dataset
+        </button>
+        <button onClick={function(){onSelect('predictor');}}
+          style={{background:'white',color:'#2563eb',border:'1px solid #2563eb',borderRadius:8,padding:'11px 16px',fontSize:15,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+          Jump to demos → Live Predictor
+        </button>
+      </div>
       <p style={{fontSize:17,color:'#64748b',marginBottom:10,lineHeight:1.8}}>
         A full-stack building-type classifier that teaches every ML concept through real source code —
         from datasets and feature engineering to model training, evaluation, dashboards, and deployment. Every code block is pulled directly from <code style={{background:'#f1f5f9',padding:'1px 5px',borderRadius:4}}>src/</code>. GradCurve is powered by EnergyTypeNet.
@@ -923,7 +1327,7 @@ function HomePage({onSelect}){
           <li><code style={{background:'#f1f5f9',padding:'1px 6px',borderRadius:4}}>data/sample_building_operations.csv</code> — small sample, great for the AutoML assistant</li>
         </ul>
       </div>
-      <h2 style={{fontSize:22,fontWeight:700,marginBottom:16,color:'#1e293b',borderBottom:'1px solid #e2e8f0',paddingBottom:8}}>29 lessons · 5 interactive demos</h2>
+      <h2 style={{fontSize:22,fontWeight:700,marginBottom:16,color:'#1e293b',borderBottom:'1px solid #e2e8f0',paddingBottom:8}}>32 lessons · 5 interactive demos</h2>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:12}}>
         {NAV.filter(function(l){return l.id!=='home';}).map(function(l){
           return(
@@ -954,13 +1358,53 @@ function hashToId(){
 function App(){
   var [cur,setCur]=useState(hashToId);
   var [visited,setVisited]=useState({});
+  var [bookmarks,setBookmarks]=useState([]);
+  var [noteIds,setNoteIds]=useState([]);
+  var [examScore,setExamScore]=useState(null);
+  var [storageWarning,setStorageWarning]=useState(false);
+  var [exportCopied,setExportCopied]=useState(false);
+  var [sidebarVisible,setSidebarVisible]=useState(function(){return !(window.innerWidth<768);});
+  var [bookmarkUndo,setBookmarkUndo]=useState(null);
+
+  function handleStorageError(){
+    setStorageWarning(true);
+  }
+
+  function saveVisited(next){
+    var list=Object.keys(next).filter(function(id){return next[id];});
+    storageWrite('lessons_visited',list,null,handleStorageError);
+  }
+
+  function markVisited(id){
+    if(id==='home') return;
+    setVisited(function(v){
+      var next=Object.assign({},v);
+      next[id]=true;
+      saveVisited(next);
+      return next;
+    });
+  }
+
+  useEffect(function(){
+    storageRead('bookmarks',[],function(value){setBookmarks(Array.isArray(value)?value:[]);},handleStorageError);
+    storageRead('notes:index',[],function(value){setNoteIds(Array.isArray(value)?value:[]);},handleStorageError);
+    storageRead('exam_score',null,function(value){setExamScore(value||null);},handleStorageError);
+    storageRead('lessons_visited',[],function(value){
+      var next={};
+      if(Array.isArray(value)) value.forEach(function(id){next[id]=true;});
+      var currentId=hashToId();
+      if(currentId!=='home') next[currentId]=true;
+      setVisited(next);
+      saveVisited(next);
+    },handleStorageError);
+  },[]);
 
   /* sync hash → state when user hits back/forward */
   useEffect(function(){
     function onHashChange(){
       var id=hashToId();
       setCur(id);
-      if(id!=='home'){setVisited(function(v){var n=Object.assign({},v);n[id]=true;return n;});}
+      markVisited(id);
     }
     window.addEventListener('hashchange', onHashChange);
     return function(){ window.removeEventListener('hashchange', onHashChange); };
@@ -969,10 +1413,74 @@ function App(){
   var handleSelect=useCallback(function(id){
     window.location.hash = id === 'home' ? '' : '/' + id;
     setCur(id);
-    if(id!=='home'){setVisited(function(v){var n=Object.assign({},v);n[id]=true;return n;});}
+    markVisited(id);
+    if(window.innerWidth<768) setSidebarVisible(false);
   },[]);
 
+  function toggleBookmark(id){
+    setBookmarks(function(current){
+      var previous=current.slice();
+      var next=current.indexOf(id)===-1?current.concat([id]):current.filter(function(x){return x!==id;});
+      storageWrite('bookmarks',next,function(){setBookmarkUndo(previous);},handleStorageError);
+      return next;
+    });
+  }
+
+  function undoBookmarkChange(){
+    if(!bookmarkUndo) return;
+    var restored=bookmarkUndo.slice();
+    storageWrite('bookmarks',restored,function(){
+      setBookmarks(restored);
+      setBookmarkUndo(null);
+    },handleStorageError);
+  }
+
+  function resetAllNotes(){
+    storageRead('notes:keys',[],function(keys){
+      if(!Array.isArray(keys)) keys=[];
+      var known=keys.slice();
+      try{
+        if(window.localStorage){
+          for(var i=0;i<window.localStorage.length;i++){
+            var k=window.localStorage.key(i);
+            if(k&&k.indexOf('note:')===0&&known.indexOf(k)===-1) known.push(k);
+          }
+        }
+      }catch(e){}
+      known.forEach(function(k){storageWrite(k,'',null,handleStorageError);});
+      storageWrite('notes:index',[],function(){setNoteIds([]);},handleStorageError);
+      storageWrite('notes:keys',[],null,handleStorageError);
+    },handleStorageError);
+  }
+
+  function exportProgress(){
+    var lessonIds=Object.keys(LESSON_IDX).filter(function(id){return id!=='home';});
+    var visitedList=lessonIds.filter(function(id){return visited[id];});
+    var data={
+      exported_at:new Date().toISOString(),
+      lessons_visited:visitedList,
+      lessons_with_notes:noteIds.slice(),
+      bookmarks:bookmarks.slice(),
+      exam_score:examScore||null,
+      completion_pct:Math.round(visitedList.length/lessonIds.length*100)
+    };
+    try{
+      var text=JSON.stringify(data,null,2);
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(function(){
+          setExportCopied(true);
+          setTimeout(function(){setExportCopied(false);},2000);
+        }).catch(function(){
+          setExportCopied(false);
+        });
+      }
+    }catch(e){
+      setExportCopied(false);
+    }
+  }
+
   var navIdx=NAV.findIndex(function(l){return l.id===cur;});
+  var isLessonPage=cur!=='home'&&cur!=='predictor'&&cur!=='gd'&&cur!=='heatmap'&&cur!=='boundary'&&cur!=='exam';
 
   /* keyboard navigation: ← prev / → next (skip if focus is inside an input) */
   useEffect(function(){
@@ -992,33 +1500,86 @@ function App(){
   else if(cur==='gd')      content=<GradientDescentViz/>;
   else if(cur==='heatmap') content=<AttentionHeatmapViz/>;
   else if(cur==='boundary')content=<DecisionBoundaryViz/>;
-  else if(cur==='exam')    content=<FinalExam/>;
+  else if(cur==='exam')    content=<FinalExam onExamScore={setExamScore} onStorageError={handleStorageError}/>;
+  else if(cur==='glossary')content=(
+    <GlossaryPage
+      lessonId={cur}
+      isBookmarked={bookmarks.indexOf(cur)!==-1}
+      onToggleBookmark={function(){toggleBookmark(cur);}}
+      onNoteSaved={setNoteIds}
+      onStorageError={handleStorageError}
+      storageWarning={storageWarning}
+    />
+  );
   else {
     var idx=LESSON_IDX[cur];
-    content=idx!==undefined?<LessonPage idx={idx}/>:<div>Coming soon</div>;
+    content=idx!==undefined?(
+      <LessonPage
+        idx={idx}
+        lessonId={cur}
+        isBookmarked={bookmarks.indexOf(cur)!==-1}
+        onToggleBookmark={function(){toggleBookmark(cur);}}
+        onNoteSaved={setNoteIds}
+        onStorageError={handleStorageError}
+        storageWarning={storageWarning}
+      />
+    ):(
+      <div style={{background:'white',border:'1px solid #e2e8f0',borderRadius:10,padding:'24px 26px',color:'#475569',lineHeight:1.8}}>
+        <div style={{fontSize:22,fontWeight:800,color:'#1e293b',marginBottom:6}}>Coming soon</div>
+        This lesson is coming soon. In the meantime, explore the existing lessons from the sidebar.
+      </div>
+    );
   }
 
   return(
     <div style={{display:'flex',height:'100%',width:'100%',overflow:'hidden'}}>
-      <Sidebar cur={cur} onSelect={handleSelect} visited={visited}/>
+      {sidebarVisible&&(
+        <Sidebar
+          cur={cur}
+          onSelect={handleSelect}
+          visited={visited}
+          bookmarks={bookmarks}
+          noteIds={noteIds}
+          onUndoBookmark={undoBookmarkChange}
+          canUndoBookmark={!!bookmarkUndo}
+          onResetNotes={resetAllNotes}
+          onExport={exportProgress}
+          exportCopied={exportCopied}
+          storageWarning={storageWarning}
+        />
+      )}
       <main style={{flex:1,overflowY:'auto',background:'#f8fafc'}}>
-        <div style={{padding:'48px 64px 80px'}}>
+        <button onClick={function(){setSidebarVisible(!sidebarVisible);}}
+          style={{position:'sticky',top:12,left:12,zIndex:20,margin:12,border:'1px solid #cbd5e1',background:'white',color:'#0f172a',borderRadius:8,padding:'8px 11px',fontSize:18,fontWeight:800,cursor:'pointer',boxShadow:'0 1px 4px rgba(15,23,42,.12)'}}>
+          ☰
+        </button>
+        <div style={{padding:window.innerWidth<768?'24px 18px 70px':'48px 64px 80px'}}>
           {content}
-          <div style={{marginTop:60,paddingTop:20,borderTop:'1px solid #e2e8f0',display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:14,color:'#94a3b8'}}>
-            <span>GradCurve · ML Education Platform · <a href="https://github.com/bartoszbryg/EnergyTypeNet" target="_blank" rel="noreferrer" style={{color:'#2563eb',fontWeight:700}}>bartoszbryg/EnergyTypeNet</a></span>
-            <div style={{display:'flex',gap:20}}>
+          <div style={{marginTop:60,paddingTop:20,borderTop:'1px solid #e2e8f0',display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:18,fontSize:14,color:'#94a3b8',flexWrap:'wrap'}}>
+            <div>
+              <span>GradCurve · ML Education Platform · <a href="https://github.com/bartoszbryg/EnergyTypeNet" target="_blank" rel="noreferrer" style={{color:'#2563eb',fontWeight:700}}>bartoszbryg/EnergyTypeNet</a></span>
+              {isLessonPage&&(
+                <button onClick={function(){handleSelect('home');}} style={{display:'block',marginTop:8,color:'#3b82f6',background:'none',border:'none',cursor:'pointer',fontSize:14,fontFamily:'inherit',padding:0}}>
+                  Back to Home
+                </button>
+              )}
+            </div>
+            <div>
+              <div style={{display:'flex',gap:20,justifyContent:'flex-end',flexWrap:'wrap'}}>
               {navIdx>0&&(
                 <button onClick={function(){handleSelect(NAV[navIdx-1].id);}}
                   style={{color:'#3b82f6',background:'none',border:'none',cursor:'pointer',fontSize:14,fontFamily:'inherit'}}>
-                  ← {NAV[navIdx-1].label}
+                  ← {shortLabel(NAV[navIdx-1].label)}
                 </button>
               )}
               {navIdx<NAV.length-1&&(
                 <button onClick={function(){handleSelect(NAV[navIdx+1].id);}}
                   style={{color:'#3b82f6',background:'none',border:'none',cursor:'pointer',fontSize:14,fontFamily:'inherit'}}>
-                  {NAV[navIdx+1].label} →
+                  {shortLabel(NAV[navIdx+1].label)} →
                 </button>
               )}
+              </div>
+              <div style={{fontSize:12,color:'#94a3b8',textAlign:'right',marginTop:6}}>← → arrow keys to navigate</div>
             </div>
           </div>
         </div>

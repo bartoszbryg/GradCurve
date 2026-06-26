@@ -57,7 +57,31 @@ ovr_reg.fit(X_sc, y)
     {t:'The weight updates overshoot the optimal value on each step — the loss oscillates and may diverge rather than decrease. Final CV accuracy is likely much lower than 0.606',e:'Correct! eta=0.5 on scaled data with binary targets causes the weights to jump over the minimum on every step. The model never settles.'},
     {t:'The model underfits because large steps skip over the correct weights',e:'Large steps cause oscillation, not underfitting in the classical sense. Underfitting means the model is too simple.'},
     {t:'No change — the model finds the same minimum regardless of eta',e:'The minimum found by gradient descent depends heavily on eta. Large eta can prevent convergence entirely.'},
-  ]}]]
+  ]},
+    {q:'Concept check. Why should you test a model on data it did not train on?',a:2,opts:[
+      {t:'Because training data is always stored in a different file format',e:'File format is not the reason. The issue is whether the model generalizes beyond rows it already saw.'},
+      {t:'Because unseen data makes the model train faster',e:'Validation does not speed up training. It measures whether training learned a useful pattern.'},
+      {t:'Because training accuracy can be overly optimistic when the model memorizes patterns',e:'Correct. Unseen validation or test data reveals whether the model learned general rules.'},
+      {t:'Because test data changes the learned weights after training',e:'A proper test set should not update weights. It is only used for evaluation.'},
+    ]},
+    {q:'Prediction check. If validation accuracy is much lower than training accuracy, what should you inspect first?',a:0,opts:[
+      {t:'Overfitting, leakage, and whether the validation split matches the real task',e:'Correct. A large gap means the model may not generalize, or the evaluation setup may be flawed.'},
+      {t:'Only the color palette in the dashboard',e:'Visual design matters, but it does not explain a train-validation performance gap.'},
+      {t:'Whether Python printed enough decimal places',e:'Formatting can hide tiny differences, but it does not cause a large accuracy gap.'},
+      {t:'Whether the model file name is short enough',e:'File names do not explain model generalization problems.'},
+    ]},
+    {q:'What would you change? A validation score looks too good because StandardScaler was fit before cross-validation. Which code change fixes the leakage?',a:1,opts:[
+      {t:'Fit StandardScaler once on the full dataset before the fold loop',e:'That is the problem. The validation fold would influence the mean and standard deviation used for training.'},
+      {t:'Inside each fold, fit StandardScaler only on X_train, then transform X_train and X_val with that scaler',e:'Correct. The validation fold stays unseen, so the score is a fairer estimate of generalisation.'},
+      {t:'Fit StandardScaler separately on X_train and X_val inside each fold',e:'That also leaks information. Validation data would get its own statistics, which the model would not have at deployment time.'},
+      {t:'Remove cross-validation and report training accuracy only',e:'That hides the problem instead of fixing it. Training accuracy cannot measure generalisation.'},
+    ]},
+    {q:'Trace the output. What does this snippet print? scores=[0.72,0.68,0.60]; total=sum(scores); print([round(s/total,2) for s in scores])',a:2,opts:[
+      {t:'[0.72, 0.68, 0.60]',e:'Those are the raw scores. The code divides each score by the total, so the values must change.'},
+      {t:'[1.00, 1.00, 1.00]',e:'Dividing by the total does not make each item one. It makes the whole list sum to one.'},
+      {t:'[0.36, 0.34, 0.30]',e:'Correct. The total is 2.00, so the normalised values are 0.72/2, 0.68/2, and 0.60/2.'},
+      {t:'[0.33, 0.33, 0.33]',e:'That would be a uniform distribution. The original scores are not equal, so the normalised values are not equal.'},
+    ]}]]
 );
 
 /* ── Step 2-8 additions: Lesson 21 — Overfitting ── */
@@ -117,7 +141,31 @@ mlp_small = MLPClassifier(hidden_layer_sizes=(20,), max_iter=1000)
     {t:'XGBoost cannot handle more than 50 features',e:'XGBoost handles thousands of features efficiently.'},
     {t:'StandardScaler failed to scale the random columns correctly',e:'StandardScaler scales all numeric columns identically. Random values scale fine.'},
     {t:'XGBoost found spurious correlations in the 50 random columns on the training set. These fake patterns held on training data but not on unseen validation data — a classic overfitting scenario from too many irrelevant features',e:'Correct! With enough features, XGBoost can always find some that accidentally correlate with the target in training data. CV accuracy reveals these are spurious — they do not hold on new data.'},
-  ]}]]
+  ]},
+    {q:'Concept check. Why should you test a model on data it did not train on?',a:2,opts:[
+      {t:'Because training data is always stored in a different file format',e:'File format is not the reason. The issue is whether the model generalizes beyond rows it already saw.'},
+      {t:'Because unseen data makes the model train faster',e:'Validation does not speed up training. It measures whether training learned a useful pattern.'},
+      {t:'Because training accuracy can be overly optimistic when the model memorizes patterns',e:'Correct. Unseen validation or test data reveals whether the model learned general rules.'},
+      {t:'Because test data changes the learned weights after training',e:'A proper test set should not update weights. It is only used for evaluation.'},
+    ]},
+    {q:'Prediction check. If validation accuracy is much lower than training accuracy, what should you inspect first?',a:0,opts:[
+      {t:'Overfitting, leakage, and whether the validation split matches the real task',e:'Correct. A large gap means the model may not generalize, or the evaluation setup may be flawed.'},
+      {t:'Only the color palette in the dashboard',e:'Visual design matters, but it does not explain a train-validation performance gap.'},
+      {t:'Whether Python printed enough decimal places',e:'Formatting can hide tiny differences, but it does not cause a large accuracy gap.'},
+      {t:'Whether the model file name is short enough',e:'File names do not explain model generalization problems.'},
+    ]},
+    {q:'What would you change? A validation score looks too good because StandardScaler was fit before cross-validation. Which code change fixes the leakage?',a:1,opts:[
+      {t:'Fit StandardScaler once on the full dataset before the fold loop',e:'That is the problem. The validation fold would influence the mean and standard deviation used for training.'},
+      {t:'Inside each fold, fit StandardScaler only on X_train, then transform X_train and X_val with that scaler',e:'Correct. The validation fold stays unseen, so the score is a fairer estimate of generalisation.'},
+      {t:'Fit StandardScaler separately on X_train and X_val inside each fold',e:'That also leaks information. Validation data would get its own statistics, which the model would not have at deployment time.'},
+      {t:'Remove cross-validation and report training accuracy only',e:'That hides the problem instead of fixing it. Training accuracy cannot measure generalisation.'},
+    ]},
+    {q:'Trace the output. What does this snippet print? scores=[0.72,0.68,0.60]; total=sum(scores); print([round(s/total,2) for s in scores])',a:2,opts:[
+      {t:'[0.72, 0.68, 0.60]',e:'Those are the raw scores. The code divides each score by the total, so the values must change.'},
+      {t:'[1.00, 1.00, 1.00]',e:'Dividing by the total does not make each item one. It makes the whole list sum to one.'},
+      {t:'[0.36, 0.34, 0.30]',e:'Correct. The total is 2.00, so the normalised values are 0.72/2, 0.68/2, and 0.60/2.'},
+      {t:'[0.33, 0.33, 0.33]',e:'That would be a uniform distribution. The original scores are not equal, so the normalised values are not equal.'},
+    ]}]]
 );
 
 /* ── Step 2-8 additions: Lesson 22 — Reading Your Results ── */
@@ -182,6 +230,30 @@ for name in results:
     {t:'XGBoost overfits on 4 features because it has too many tree splits available',e:'Overfitting would show CV improving but test accuracy staying the same or dropping. Both improved here.'},
     {t:'Occupants and Appliances contain genuine discriminating information: the 4-feature space separates classes better than the 2-feature space. The consistent improvement on both CV and test confirms this is real signal, not noise',e:'Correct! When both CV and test accuracy improve by similar amounts, the new features carry real information. The consistent gap between them (CV≈0.631, test≈0.678) shows no leakage.'},
     {t:'The results are not comparable because different feature sets use different StandardScaler parameters',e:'StandardScaler is fitted fresh inside each CV fold on whichever features are used. The comparison is fair.'},
-  ]}]]
+  ]},
+    {q:'Concept check. Why should you test a model on data it did not train on?',a:2,opts:[
+      {t:'Because training data is always stored in a different file format',e:'File format is not the reason. The issue is whether the model generalizes beyond rows it already saw.'},
+      {t:'Because unseen data makes the model train faster',e:'Validation does not speed up training. It measures whether training learned a useful pattern.'},
+      {t:'Because training accuracy can be overly optimistic when the model memorizes patterns',e:'Correct. Unseen validation or test data reveals whether the model learned general rules.'},
+      {t:'Because test data changes the learned weights after training',e:'A proper test set should not update weights. It is only used for evaluation.'},
+    ]},
+    {q:'Prediction check. If validation accuracy is much lower than training accuracy, what should you inspect first?',a:0,opts:[
+      {t:'Overfitting, leakage, and whether the validation split matches the real task',e:'Correct. A large gap means the model may not generalize, or the evaluation setup may be flawed.'},
+      {t:'Only the color palette in the dashboard',e:'Visual design matters, but it does not explain a train-validation performance gap.'},
+      {t:'Whether Python printed enough decimal places',e:'Formatting can hide tiny differences, but it does not cause a large accuracy gap.'},
+      {t:'Whether the model file name is short enough',e:'File names do not explain model generalization problems.'},
+    ]},
+    {q:'What would you change? A validation score looks too good because StandardScaler was fit before cross-validation. Which code change fixes the leakage?',a:1,opts:[
+      {t:'Fit StandardScaler once on the full dataset before the fold loop',e:'That is the problem. The validation fold would influence the mean and standard deviation used for training.'},
+      {t:'Inside each fold, fit StandardScaler only on X_train, then transform X_train and X_val with that scaler',e:'Correct. The validation fold stays unseen, so the score is a fairer estimate of generalisation.'},
+      {t:'Fit StandardScaler separately on X_train and X_val inside each fold',e:'That also leaks information. Validation data would get its own statistics, which the model would not have at deployment time.'},
+      {t:'Remove cross-validation and report training accuracy only',e:'That hides the problem instead of fixing it. Training accuracy cannot measure generalisation.'},
+    ]},
+    {q:'Trace the output. What does this snippet print? scores=[0.72,0.68,0.60]; total=sum(scores); print([round(s/total,2) for s in scores])',a:2,opts:[
+      {t:'[0.72, 0.68, 0.60]',e:'Those are the raw scores. The code divides each score by the total, so the values must change.'},
+      {t:'[1.00, 1.00, 1.00]',e:'Dividing by the total does not make each item one. It makes the whole list sum to one.'},
+      {t:'[0.36, 0.34, 0.30]',e:'Correct. The total is 2.00, so the normalised values are 0.72/2, 0.68/2, and 0.60/2.'},
+      {t:'[0.33, 0.33, 0.33]',e:'That would be a uniform distribution. The original scores are not equal, so the normalised values are not equal.'},
+    ]}]]
 );
 /* === Human clarity pass: exact src code and predictive quiz fixes === */
