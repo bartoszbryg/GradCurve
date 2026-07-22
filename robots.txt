@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://bartoszbryg.github.io/GradCurve/sitemap.xml

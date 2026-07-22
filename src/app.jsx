@@ -1190,6 +1190,24 @@ function FinalExam({onExamScore,onStorageError}){
             {shareCopied?'✓ Copied!':'Share results'}
           </button>
         </div>
+        <p style={{
+          marginTop:24,
+          fontSize:14,
+          color:'#64748b',
+          lineHeight:1.7,
+          textAlign:'center'
+        }}>
+          Got feedback? I read every response —{' '}
+          <a
+            href="https://forms.gle/8oxbbTuUgpezAGcu6"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{color:'#3b82f6',fontWeight:600}}
+          >
+            tell me what to improve
+          </a>
+          {' '}(takes 2 minutes)
+        </p>
       </div>
     );
   }
@@ -1509,6 +1527,22 @@ function Sidebar({cur,onSelect,visited,bookmarks,noteIds,onUndoBookmark,canUndoB
           style={{width:'100%',border:'1px solid #7f1d1d',background:'#2b1111',color:'#fecaca',borderRadius:7,padding:'8px 10px',fontSize:17,fontWeight:800,cursor:'pointer',fontFamily:'inherit',marginBottom:10}}>
           Reset all notes
         </button>
+        <a
+          href="https://forms.gle/8oxbbTuUgpezAGcu6"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display:'block',
+            fontSize:15,
+            color:'#64748b',
+            marginBottom:8,
+            textDecoration:'none'
+          }}
+          onMouseEnter={function(e){e.currentTarget.style.color='#93c5fd';}}
+          onMouseLeave={function(e){e.currentTarget.style.color='#64748b';}}
+        >
+          💬 Give feedback
+        </a>
         Built by Bartosz Bryg · Python 3.12 · scikit-learn · XGBoost · FastAPI · Streamlit · MLflow
         <a href="https://github.com/bartoszbryg/EnergyTypeNet" target="_blank" rel="noreferrer" title="GitHub repository"
           style={{display:'inline-flex',alignItems:'center',gap:5,color:'#93c5fd',fontWeight:700,marginLeft:6,textDecoration:'none'}}>

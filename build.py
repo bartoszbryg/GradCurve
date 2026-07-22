@@ -43,7 +43,9 @@ def static_src(filename):
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def catch_all(path):
-    """Return index.html for every other URL (SPA pattern)."""
+    """Serve real root files, then fall back to index.html for app routes."""
+    if path and (ROOT / path).is_file():
+        return send_from_directory(ROOT, path)
     return send_from_directory(ROOT, 'index.html')
 
 
