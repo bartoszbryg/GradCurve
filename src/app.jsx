@@ -142,7 +142,11 @@ function formulaPreset(formula){
   if(f.indexOf('D_{KS}')!==-1) return preset('Distribution drift','new cumulative share','reference share',0,1,.01,0,1,.01,function(a,b){return Math.abs(a-b);},function(a,b,y){return '|'+a.toFixed(2)+' − '+b.toFixed(2)+'| = '+y.toFixed(2);},'KS gap');
   if(f.indexOf('trustworthy report')!==-1) return preset('Model-card completeness','evidence coverage','limitation coverage',0,1,.01,0,1,.01,function(e,l){return Math.sqrt(e*l);},function(e,l,y){return '√('+e.toFixed(2)+' × '+l.toFixed(2)+') = '+y.toFixed(2);},'balanced completeness');
   if(f.indexOf('route(question')!==-1) return preset('Grounded-answer readiness','fact coverage','history relevance',0,1,.01,0,1,.01,function(e,l){return .7*e+.3*l;},function(e,l,y){return '0.7 × '+e.toFixed(2)+' + 0.3 × '+l.toFixed(2)+' = '+y.toFixed(2);},'context readiness');
-  return preset('Formula sensitivity','input value','context value',0,10,.1,0,10,.1,function(a,b){return a+b;},function(a,b,y){return a.toFixed(1)+' + '+b.toFixed(1)+' = '+y.toFixed(1);},'combined result');
+  if(f.indexOf('feature }j\\text{ shuffled')!==-1) return preset('Permutation-importance drop','baseline accuracy','shuffled-feature accuracy',.3,1,.01,.3,1,.01,function(base,shuffled){return base-shuffled;},function(base,shuffled,y){return base.toFixed(2)+' − '+shuffled.toFixed(2)+' = '+y.toFixed(2);},'accuracy drop');
+  if(f.indexOf('GridSearch:')!==-1) return preset('Hyperparameter search curve','log₁₀(C)','solver adjustment',-2,1,.1,-.03,.03,.005,function(logc,adj){return .69-.035*Math.pow(logc,2)+adj;},function(logc,adj,y){return 'C = 10^'+logc.toFixed(1)+'; illustrative CV score = '+y.toFixed(3);},'CV score');
+  if(f.indexOf('\\hat{p}(y=c\\mid x)')!==-1) return preset('Bagging probability average','one tree probability','other trees average',0,1,.01,0,1,.01,function(p,q){return (p+9*q)/10;},function(p,q,y){return '('+p.toFixed(2)+' + 9 × '+q.toFixed(2)+') / 10 = '+y.toFixed(3);},'10-tree average probability');
+  if(f.indexOf('\\alpha_t=\\eta')!==-1) return preset('AdaBoost learner weight','estimator error eₜ','learning rate η',.01,.65,.01,.05,1,.05,function(err,lr){return lr*(Math.log((1-err)/err)+Math.log(2));},function(err,lr,y){return lr.toFixed(2)+' × [ln((1−'+err.toFixed(2)+')/'+err.toFixed(2)+') + ln(2)] = '+y.toFixed(3);},'SAMME learner weight');
+  return null;
 }
 
 function FormulaExplorer({formula}){
@@ -206,6 +210,7 @@ function MathB({children}){
   var formulaRef=useRef(null);
   var formula=String(children||'');
   var isLatex=/\\[a-zA-Z]+|[_^{}]/.test(formula);
+  var hasExplorer=!!formulaPreset(formula);
   useEffect(function(){
     if(!formulaRef.current||!isLatex||!window.katex)return;
     try{
@@ -221,7 +226,7 @@ function MathB({children}){
   return(
     <div className="math-block" role="math" aria-label={formula} style={{background:'#f1f5f9',border:'1px solid #e2e8f0',borderRadius:10,padding:'14px 20px',margin:'16px 0',textAlign:'center',fontFamily:isLatex?'serif':'monospace',fontSize:19,overflowX:'auto',overflowY:'hidden',WebkitOverflowScrolling:'touch'}}>
       <div ref={formulaRef} style={{minWidth:'max-content'}}>{formula}</div>
-      <FormulaExplorer formula={formula}/>
+      {hasExplorer&&<FormulaExplorer formula={formula}/>}
     </div>
   );
 }
