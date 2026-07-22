@@ -1,7 +1,7 @@
 ﻿window.BLOCKS[11].push(
   ['h2', "Exact source code - Evaluation Metrics"],
   ['p', "Why this exists: without confusion matrices, accuracy hides which classes are being confused with each other."],
-  ['code', "src/evaluation.py (exact source)", `def plot_confusion_matrices(
+  ['code', "src/evaluation.py", `def plot_confusion_matrices(
     named_models: list,
     y_test: np.ndarray,
     figsize=(15, 9),
@@ -120,7 +120,7 @@ fig = plot_confusion_matrices(named_models, y_test, figsize=(18, 10))
 window.BLOCKS[12].push(
   ['h2', "Exact source code - Decision Boundaries"],
   ['p', "Why this exists: without boundary plots, users cannot see where each model changes its mind in feature space."],
-  ['code', "src/evaluation.py (exact source)", `def plot_decision_boundaries(
+  ['code', "src/evaluation.py", `def plot_decision_boundaries(
     named_models: list,
     X_sc: np.ndarray,
     y: np.ndarray,
@@ -290,7 +290,7 @@ fig = plot_decision_boundaries(named_models, X_sc, y, figsize=(20, 12))
 window.BLOCKS[13].push(
   ['h2', "Exact source code - MLflow"],
   ['p', "Why this exists: without logging, model comparisons live only in terminal output and cannot be audited later."],
-  ['code', "src/train.py (exact source)", `def log_to_mlflow(output: dict, model_path: Path, feature_set: str) -> None:
+  ['code', "src/train.py", `def log_to_mlflow(output: dict, model_path: Path, feature_set: str) -> None:
     """Log every candidate's CV scores plus the best model artifact to MLflow."""
     mlflow.set_experiment('EnergyTypeNet')
     with mlflow.start_run(run_name=f'train-{feature_set}'):
@@ -389,7 +389,7 @@ log_to_mlflow(output_all, Path('artifacts/model_all.joblib'), 'all')
 window.BLOCKS[14].push(
   ['h2', "Exact source code - FastAPI"],
   ['p', "Why this exists: without the API layer, only Python users could run the model and other systems could not request predictions."],
-  ['code', "src/api.py (exact source)", `class BuildingFeatures(BaseModel):
+  ['code', "src/api.py", `class BuildingFeatures(BaseModel):
     square_footage: float = Field(..., gt=0)
     number_of_occupants: float = Field(..., ge=0)
     appliances_used: float = Field(..., ge=0)
@@ -506,7 +506,7 @@ POST /predict with energy_consumption=-1
 window.BLOCKS[15].push(
   ['h2', "Exact source code - Docker"],
   ['p', "Why this exists: without the Dockerfile, deployment depends on whatever Python packages happen to be installed on the host machine."],
-  ['code', "Dockerfile (exact source)", `FROM python:3.12-slim
+  ['code', "Dockerfile", `FROM python:3.12-slim
 
 WORKDIR /app
 

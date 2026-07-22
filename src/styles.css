@@ -8,15 +8,21 @@ body {
   background: #f8fafc;
   color: #1e293b;
   font-family: system-ui, -apple-system, sans-serif;
-  font-size: 16px;
-  zoom: 1.4;
+  font-size: 19px;
 }
 
 #root {
   display: flex;
-  height: calc(100vh / 1.4);
+  height: 100dvh;
   overflow: hidden;
-  width: calc(100vw / 1.4);
+  width: 100vw;
+}
+
+main,
+main > div,
+.responsive-grid > *,
+.grid-auto > * {
+  min-width: 0;
 }
 
 ::-webkit-scrollbar {
@@ -49,6 +55,36 @@ code {
   font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
 }
 
+pre {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.math-block,
+div[style*='fontFamily: monospace'],
+[role='math'] {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.grid-auto {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+table {
+  display: block;
+  overflow-x: auto;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+svg,
+canvas {
+  max-width: 100%;
+}
+
 a {
   color: #3b82f6;
   text-decoration: none;
@@ -56,6 +92,26 @@ a {
 
 a:hover {
   text-decoration: underline;
+}
+
+@media (max-width: 700px) {
+  .responsive-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+@media (max-width: 600px) {
+  button,
+  input[type='range'] {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 480px) {
+  .callout-box {
+    border-left-width: 4px !important;
+    padding: 12px 14px !important;
+  }
 }
 
 /* Token colors for code blocks. */

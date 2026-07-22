@@ -159,7 +159,7 @@ window.BLOCKS[9].push(
   ['h2', 'When do ensembles NOT help?'],
   ['p', 'If all base models make the same mistakes, combining them helps nothing. If Logistic Regression, MLP, and XGBoost all predict "Commercial" for the same set of ambiguous buildings, the ensemble also predicts "Commercial" for all of them. Diversity is the key ingredient — the base models must make different mistakes.'],
   ['p', 'Diversity comes from: different algorithm families (linear vs trees vs neural nets), different feature subsets, different random seeds, different training subsets. This project gets diversity by using three fundamentally different algorithm types.'],
-  ['callout','warning','Ensembles add latency','In production, you must run all 5 models (LR, MLP, XGBoost, VotingClassifier, StackingClassifier) to get one prediction. Each model takes time. If a single prediction needs to complete in 10ms for a real-time application, and each model takes 5ms, an ensemble of 5 exceeds the budget. The accuracy vs latency trade-off must be evaluated for your use case.'],
+  ['callout','warning','Ensembles add latency','A fitted voting or stacking prediction runs its three base learners (Logistic Regression, MLP and XGBoost) before combining their probabilities. The production trainer now compares nine candidates—including Extra Trees, HistGradientBoosting, custom Bagging and custom AdaBoost—but only the winning fitted candidate is saved for serving. Measure that saved winner rather than assuming all nine models run per request.'],
   ['h2', 'Stacking in depth: what the meta-model learns'],
   ['p', 'The meta-model (a LogisticRegression) receives a 3-column input for each building: [LR_proba, MLP_proba, XGB_proba]. It learns weights for each base model\'s predictions. These weights are not equal — the meta-model might learn to trust XGBoost much more than Logistic Regression for Industrial buildings, while trusting them equally for Residential.'],
   ['code', 'What the meta-model sees as training data',
@@ -407,7 +407,7 @@ def format_prediction_bar(prob): ...    # < 1ms, pure math
 def build_sidebar(): ...                # < 5ms, just drawing UI
 def render_result_card(class_name): ... # < 1ms, just HTML`],
   ['h2', 'The Custom Dataset mode — how it handles any CSV'],
-  ['p', 'When a user uploads a CSV, Streamlit passes it to automl.py. The profiler examines every column. The user selects the target column. The preprocessor automatically handles text columns (OneHotEncoder), missing values (median/mode imputation), and different numeric scales (StandardScaler). All 8 baseline models are trained with 5-fold CV. Results appear in a sorted table with accuracy and F1 scores.'],
+  ['p', 'When a user uploads a CSV, Streamlit passes it to automl.py. The profiler examines every column. The user selects the target column. The preprocessor handles categorical columns (OneHotEncoder), missing values (median/mode imputation), and different numeric scales (StandardScaler). The current builder offers eleven classification candidates and eleven regression candidates when optional XGBoost is available, including a dummy baseline; unavailable optional models are skipped cleanly. Cross-validation results appear with task-appropriate metrics.'],
   ['callout','info','Why is there a "Download results" button?','Users often run the dashboard in a browser session that ends. The results — which feature set gave the best accuracy, which model won, the confusion matrix — are computed in memory and lost when the session closes. The download button converts results to a CSV or JSON file that the user can save. This is a standard Streamlit UX pattern for analytical tools.'],
   ['callout','warning','Streamlit is not a production API','Streamlit is excellent for data exploration, prototyping, and internal tools. It is NOT designed for production traffic — each user session runs a full Python process, which does not scale well beyond dozens of concurrent users. For a public-facing prediction service, use FastAPI (Lesson 14). Use Streamlit for data scientists and internal stakeholders, FastAPI for engineers building on top of the model.']
 );
@@ -492,7 +492,7 @@ window.BLOCKS[19].push(
   ['h2', 'Extension points: where to add new things'],
   ['p', 'The project is designed to be extensible. Here is exactly where to make changes for common additions:'],
   ['code', 'Adding a new ML model',
-`# 1. Implement the model in src/models.py
+`# 1. Implement the model in the appropriate src/models/ module
 #    Follow the sklearn API: fit(X, y), predict(X), predict_proba(X)
 
 class MyNewModel:
@@ -533,7 +533,7 @@ if feature_set == 'temporal':
 
 # Run: python -m src.train --feature-set temporal`],
   ['callout','info','How the website connects to the Python project','This educational website (the one you are reading now) is built separately from the Python ML code. The website lives in website/src/ and runs as a static site served by Flask (website/build.py). The lesson content (this file, lesson-blocks.js) describes what the Python code does but does not import or run it. The Live Predictor demo in the Streamlit dashboard (dashboard.py) is where you actually run the Python code interactively.'],
-  ['callout','analogy','Think of the project as a three-layer cake','Layer 1 (bottom): the data and models — src/data.py, src/models.py, src/evaluation.py. Pure Python + NumPy, no web, no visualisation. Layer 2 (middle): the services — src/train.py (training pipeline), src/api.py (FastAPI prediction service), dashboard.py (Streamlit UI). Layer 3 (top): the education — this website explains layers 1 and 2 to learners. Each layer can be changed independently without breaking the others.']
+  ['callout','analogy','Think of the project as a three-layer cake','Layer 1 (bottom): the data and models — src/data.py, the family modules in src/models/, and src/evaluation.py. Layer 2 (middle): the services — src/train.py, src/api.py and dashboard.py. Layer 3 (top): GradCurve explains layers 1 and 2 without importing their Python runtime.']
 );
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -835,7 +835,7 @@ window.BLOCKS[17].push(
 Please explain:
 1. What is CI/CD? What problem does it solve? What is the difference between CI (Continuous Integration) and CD (Continuous Deployment)?
 2. Walk through my ci.yml file line by line: on: [push], runs-on: ubuntu-latest, matrix python versions, steps (checkout, setup-python, pip install, pytest, import verification).
-3. What does the matrix strategy do? Why test on Python 3.10 AND 3.12?
+3. What does the matrix strategy do? Why does the current workflow list Python 3.11, and how would adding another value expand compatibility coverage?
 4. Why do we verify imports separately from running tests? What kind of bug does import verification catch that pytest misses?
 5. How do I write a new test for make_engineered_features()? Walk me through the structure of a good pytest test.
 6. What is the red ✗ / green ✓ on a pull request? How does the branch protection rule work?
@@ -864,7 +864,7 @@ window.BLOCKS[19].push(
   ['prompt','Full ML Project Architecture',
 `I want to understand how a complete machine learning project fits together. I have a building type classifier project with this structure:
 
-data/train_energy_data.csv (1 000 buildings) → src/data.py → src/models.py + src/evaluation.py → src/train.py → artifacts/model.joblib → src/api.py (FastAPI) → HTTP predictions
+data/train_energy_data.csv (1 000 buildings) → src/data.py → src/models/ + src/evaluation.py → src/train.py → artifacts/model.joblib → src/api.py (FastAPI) → HTTP predictions
 Also: dashboard.py (Streamlit), .github/workflows/ci.yml (GitHub Actions), Dockerfile
 
 Please explain:

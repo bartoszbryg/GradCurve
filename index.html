@@ -8,8 +8,30 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 
-    <link rel="stylesheet" href="src/styles.css" />
+    <link rel="stylesheet" href="src/styles.css?v=20260722-font3" />
+    <style>
+      /* Critical viewport rules live inline so stale CSS can never shorten the app. */
+      html,
+      body {
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 100% !important;
+        overflow: hidden !important;
+        zoom: 1 !important;
+      }
+
+      #root {
+        position: fixed !important;
+        inset: 0 !important;
+        width: auto !important;
+        height: auto !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
@@ -32,7 +54,14 @@
     <script src="src/lesson-content/12-production-expansions.js"></script>
     <script src="src/lesson-content/13-glossary.js"></script>
     <script src="src/lesson-content/14-final-audit-polish.js"></script>
+    <script src="src/lesson-content/16-classical-ml.js"></script>
+    <script src="src/lesson-content/17-deep-learning.js"></script>
+    <script src="src/lesson-content/18-production-xai.js"></script>
+    <script src="src/lesson-content/19-perceptron.js"></script>
+    <script src="src/lesson-content/20-audit-completions.js"></script>
+    <script src="src/lesson-content/21-current-project-sync.js"></script>
+    <script src="src/lesson-content/15-new-lesson-stubs.js"></script>
     <script src="src/streamlit-tips.js"></script>
-    <script type="text/babel" src="src/app.jsx"></script>
+    <script type="text/babel" src="src/app.jsx?v=20260722-exam-font"></script>
   </body>
 </html>

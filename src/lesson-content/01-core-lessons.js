@@ -234,7 +234,7 @@ window.BLOCKS[4] = [
   ['math', 'σ(z) = 1 / (1 + e^{−z})      z = w₁×energy + w₂×sqft + bias'],
   ['p', 'The model learns the weights (w₁, w₂, bias) through gradient descent — it starts with random weights, checks how wrong it is, and nudges the weights in the right direction, 1 000 times.'],
   ['h2','The sigmoid function — with a safety fix'],
-  ['code','src/models.py',
+  ['code','src/models/linear.py',
 `class LogisticRegressionOvR:
 
     @staticmethod
@@ -243,7 +243,7 @@ window.BLOCKS[4] = [
         # Clipping to [-250, 250] keeps all values in a safe range
         return 1.0 / (1.0 + np.exp(-np.clip(z, -250, 250)))`],
   ['h2','Training one binary classifier — step by step'],
-  ['code','src/models.py',
+  ['code','src/models/linear.py',
 `    def _fit_binary(self, X, y_bin, rng):
         # Start with tiny random weights near zero
         w = rng.normal(0.0, 0.01, size=1 + X.shape[1])
@@ -263,7 +263,7 @@ window.BLOCKS[4] = [
         return w`],
   ['callout','info','What is L2 regularisation?','Without regularisation, the model might make its weights extremely large to perfectly fit the training data — but then it fails on new data (overfitting). L2 regularisation (alpha × w) is a gentle penalty that says "keep the weights small unless there is a really good reason to make them big." It improves generalisation.'],
   ['h2','Training all three classifiers and combining predictions'],
-  ['code','src/models.py',
+  ['code','src/models/linear.py',
 `    def fit(self, X, y):
         self.classes_ = np.unique(y)   # [0, 1, 2]
 
@@ -326,7 +326,7 @@ window.BLOCKS[5] = [
   ['math', 'P(class k) = exp(score_k) / (exp(score_0) + exp(score_1) + exp(score_2))'],
   ['p', 'The exp() function makes all scores positive. Dividing by the total makes them sum to 1. Simple and elegant.'],
   ['h2','Numerically safe softmax — avoiding overflow'],
-  ['code','src/models.py',
+  ['code','src/models/linear.py',
 `    @staticmethod
     def _softmax(z):
         # Problem: exp(1000) = infinity. This crashes Python.
@@ -337,7 +337,7 @@ window.BLOCKS[5] = [
         exp_z = np.exp(z)                          # exp of negative = safe!
         return exp_z / exp_z.sum(axis=1, keepdims=True)`],
   ['h2','The weight matrix and training'],
-  ['code','src/models.py',
+  ['code','src/models/linear.py',
 `    def fit(self, X, y):
         # One row of weights per class — shape is (3 classes, 2 features for core)
         self.W_ = rng.normal(0.0, 0.01, size=(n_classes, n_features))
@@ -396,7 +396,7 @@ window.BLOCKS[6] = [
   ['p', 'The "loudness" of each vote is controlled by a bandwidth parameter w. Small w = only very close neighbours matter. Large w = all neighbours vote equally.'],
   ['math', 'weight_i = exp(−distance(building_i, query) / w)      then normalise so all weights sum to 1'],
   ['h2','The full implementation in 27 lines'],
-  ['code','src/models.py',
+  ['code','src/models/linear.py',
 `class AttentionClassifier:
 
     def __init__(self, w: float = 1.0):
@@ -1173,7 +1173,7 @@ window.BLOCKS[16] = [
   ['callout','analogy','Streamlit\'s reruns — like a live spreadsheet','When you change a cell in Excel, the spreadsheet recalculates. When you move a slider in Streamlit, the entire Python script reruns from top to bottom. This is simple but powerful. The caching decorators prevent expensive recalculations (like model training) from happening on every slider move.'],
   ['h2','The two caching decorators'],
   ['p', 'Streamlit reruns the whole script on every interaction. Without caching, this would retrain all models every time you move a slider. Caching saves computed results and returns them instantly on subsequent reruns.'],
-  ['code','dashboard.py',
+  ['code','Caching pattern (educational sketch)',
 `# @st.cache_data: caches return value as a file (pickle).
 # Best for: DataFrames, numpy arrays, raw data, simple Python objects.
 @st.cache_data
@@ -1194,7 +1194,7 @@ def train_energy_models(_scaler):
     attn    = AttentionClassifier(w=2.0).fit(X_sc, y)
     return ovr, softmax, attn
 # First call: trains 3 models in ~5 seconds. All later calls: instant from RAM.`],
-  ['callout','info','Why cache_resource for models, not cache_data?','cache_data pickles (serialises) the return value to disk. Some sklearn and custom model objects fail to pickle correctly. cache_resource stores the object directly in Python memory — no serialisation — which is always safe for ML model objects.'],
+  ['callout','info','Why cache_resource for models, not cache_data?','cache_data serialises and returns copies of data-like values. Sklearn pipelines are generally serialisable, but a trained model is an expensive shared resource whose identity should be preserved. cache_resource keeps that object in memory so reruns can reuse it without copying or retraining.'],
   ['h2','Three-mode architecture'],
   ['code','dashboard.py (mode switching)',
 `mode = st.sidebar.radio(
@@ -1221,7 +1221,7 @@ elif mode == 'AI Dataset Assistant':
   ['quiz',[
     {q:'Why use @st.cache_resource instead of @st.cache_data for trained models?',a:1,opts:[
       {t:'cache_data does not support functions that return multiple values',e:'Both decorators support multiple return values via tuples.'},
-      {t:'cache_data pickles the return value; sklearn objects can sometimes fail to pickle reliably; cache_resource stores the Python object directly in memory — always safe',e:'Correct! In-memory storage avoids serialisation issues entirely.'},
+      {t:'cache_resource preserves and reuses one expensive model object without repeatedly copying or retraining it',e:'Correct! Resource caching matches the lifecycle and identity of a trained model.'},
       {t:'cache_resource is 10× faster because it uses a hash table',e:'Speed difference is negligible. Safety is the reason.'},
       {t:'Streamlit requires cache_resource for any function with arguments',e:'Both decorators work with functions that take arguments.'},
     ]},
@@ -1269,10 +1269,9 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ['3.10', '3.12']
-    # This creates TWO parallel jobs: one for Python 3.10, one for 3.12.
-    # If your code uses a Python 3.11+ feature, it will pass 3.12 but fail 3.10.
-    # The matrix catches this compatibility issue immediately.
+        python-version: ['3.11']
+    # The current workflow has one matrix entry. Keeping the matrix structure
+    # makes it easy to add another supported Python version later.
 
     steps:
       - uses: actions/checkout@v4     # Step 1: clone your repository
@@ -1292,8 +1291,14 @@ jobs:
       - name: Verify imports          # Step 5: make sure all modules import cleanly
         run: |
           python -c "from src.data import load_features, make_engineered_features"
-          python -c "from src.models import AttentionClassifier, LogisticRegressionOvR"
-          python -c "from src.evaluation import cross_validate_custom, make_skf"`],
+          python -c "from src.models import AttentionClassifier, MLPCustom, BaggingClassifierCustom"
+          python scripts/verify_model_imports.py
+
+  deploy-check:
+    needs: test
+    runs-on: ubuntu-latest
+    # On pull requests and pushes to main, also import dashboard.py,
+    # compile the source, scan for API keys and validate Streamlit config.`],
   ['h2','What the tests cover'],
   ['code','tests/ — what each file covers',
 `tests/test_data.py
@@ -1308,16 +1313,22 @@ tests/test_api.py
   test_health_endpoint()                 → GET /health → {"status": "ok"}
   test_predict_endpoint_returns_proba()  → POST /predict → class + probabilities dict
 
-tests/test_automl.py   (9 tests)
-  → profile_dataset, suggest_targets, prepare_dataset, train_baselines, Q&A
+tests/test_automl.py
+  → profiling, target/feature suggestions, preprocessing, baselines, reports and Q&A
 
-tests/test_llm_assistant.py   (4 tests)
-  → context building, prompt grounding, fallback when Ollama is disabled`],
-  ['callout','info','Why verify imports separately from tests?','A test suite only covers code that tests explicitly call. If src/models.py has a syntax error in a function that no test calls, pytest -q passes — but the module fails when your app imports it in production. The import verification step catches these silent issues by importing every module.'],
+tests/test_explainability.py
+  → SHAP/LIME routing, local explanations and global importance
+
+tests/test_llm_assistant.py + test_chat_agent.py
+  → grounded context, provider fallback, history and follow-up behavior
+
+tests/test_ensemble_custom.py + test_model_package_imports.py
+  → custom Bagging/AdaBoost behavior and package compatibility`],
+  ['callout','info','Why verify imports separately from tests?','A test suite only covers code that tests explicitly call. If a model-family module has a syntax error in a function that no test calls, pytest -q can miss it — but the module fails when your app imports it in production. The import verification step catches these silent issues by importing every module.'],
   ['quiz',[
-    {q:'strategy.matrix python-version: ["3.10", "3.12"] creates how many CI jobs?',a:1,opts:[
-      {t:'1 — GitHub picks the faster version and only runs on that one',e:'Matrix strategy runs the job once PER VALUE. It never skips entries.'},
-      {t:'2 — one per Python version. Both must pass for the workflow to show green',e:'Correct! A failure on either version fails the whole workflow.'},
+    {q:'The current strategy.matrix contains python-version: ["3.11"]. How many test jobs does that matrix create?',a:0,opts:[
+      {t:'1 — the matrix runs once for its single version value',e:'Correct. One matrix value creates one test job.'},
+      {t:'2 — GitHub always duplicates matrix jobs',e:'Jobs are created from the values explicitly listed.'},
       {t:'5 — one per pytest test file',e:'The matrix is independent of the number of test files.'},
       {t:'4 — two Python versions times two step groups (tests + imports)',e:'Each matrix entry is one job that runs ALL steps sequentially.'},
     ]},
@@ -1472,7 +1483,7 @@ window.BLOCKS[19] = [
 │   │     plot_decision_boundaries(), plot_confusion_matrices(), plot_learning_curves()
 │   │
 │   ├── train.py                 Orchestrates the full training pipeline
-│   │     build_models()          Creates all 5 models (LR, MLP, XGB, Voting, Stack)
+│   │     build_models()          Creates 9 production candidates
 │   │     evaluate_models()       Runs 5-fold CV on all models
 │   │     train_best_model()      Refits the winner on all training data
 │   │     log_to_mlflow()         Records the run in MLflow
@@ -1507,7 +1518,7 @@ window.BLOCKS[19] = [
 ├── dashboard.py                 Streamlit app (3 modes, ~1 000 lines)
 ├── Dockerfile                   Build → Train → Expose port 8000
 ├── requirements.txt             All Python dependencies
-└── .github/workflows/ci.yml    pytest on Python 3.10 + 3.12 (GitHub Actions)`],
+└── .github/workflows/ci.yml    Python 3.11 tests plus deploy checks`],
   ['h2','The complete data flow — from CSV to HTTP response'],
   ['code','End-to-end: how data moves through the system',
 `① CSV file: data/train_energy_data.csv
@@ -1551,7 +1562,7 @@ window.BLOCKS[19] = [
 
 ⑩ HTTP response:
    {"class": "Residential", "probabilities": {"Residential": 0.71, ...}}`],
-  ['callout','info','Where to start reading the code','Start with src/data.py — it is small (100 lines) and everything depends on it. Then src/models.py to understand the three classifiers. Then src/train.py to see how training is orchestrated. Then src/evaluation.py for the CV loop. Finally src/api.py and dashboard.py to see how the model reaches users.'],
+  ['callout','info','Where to start reading the code','Start with src/data.py because everything depends on it. Then read the src/models/ family modules, especially linear.py, to understand the custom classifiers. Continue with src/train.py and src/evaluation.py, then src/api.py and dashboard.py to see how the model reaches users.'],
   ['quiz',[
     {q:'train_best_model() calls best_model.fit(X_train, y_train) AFTER cross-validation. Why refit on the full training set?',a:2,opts:[
       {t:'Cross-validation corrupts the model weights, so they must be reset',e:'CV trains temporary copies on 80% of data. The original model object is untouched by cross-validation.'},

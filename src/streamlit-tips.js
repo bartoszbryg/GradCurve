@@ -102,7 +102,7 @@ var ST = {
 /* 17 — GitHub Actions */
 (window.BLOCKS[17] || (window.BLOCKS[17] = [])).push(ST.tip(
   'GitHub → Actions tab',
-  'After pushing any commit to GitHub:\n1. Go to your repository on GitHub\n2. Click the Actions tab\n3. You see two jobs running in parallel: "Python 3.10" and "Python 3.12"\n4. Click a job → expand "Run tests" → see pytest output\n5. Expand "Verify imports" — if any import fails, this step shows which module broke\n6. Try breaking an import on purpose: add a syntax error to src/models.py, push, watch which step fails\n7. Fix it and push again — CI goes green'
+  'After pushing any commit to GitHub:\n1. Go to your repository on GitHub\n2. Click the Actions tab\n3. Open the test job for the configured Python version\n4. Expand "Run tests" to see pytest output\n5. Expand the import/deploy checks if a module fails to load\n6. Locally, introduce and immediately undo a harmless syntax error in a model module such as src/models/linear.py to understand the failure message—do not push intentionally broken code\n7. Run the checks again and confirm they return green'
 ));
 
 /* 18 — AutoML */
@@ -114,7 +114,7 @@ var ST = {
 /* 19 — Codebase Tour */
 (window.BLOCKS[19] || (window.BLOCKS[19] = [])).push(ST.tip(
   'GradCurve → Overview',
-  'Run: streamlit run dashboard.py → Mode: EnergyTypeNet → Page: Overview\nThe Overview page shows:\n• Test accuracy for all 5 models (the number train_best_model() computed)\n• The best model name (usually XGBoost)\n• 4 headline metrics at the top\nThis is what an end user sees — a production deployment would show this page.\nNow trace the code path that produced these numbers:\n  1. src/train.py → train_best_model() → evaluate_models() → 5-fold CV\n  2. best model refit on full X_train\n  3. test accuracy computed on data/test_energy_data.csv (100 unseen buildings)\n  4. joblib.dump() → artifacts/model.joblib\n  5. dashboard.py loads artifacts/model.joblib at startup'
+  'Run: streamlit run dashboard.py → Mode: EnergyTypeNet → Page: Overview\nThe current Overview uses preloaded comparison artifacts so the hosted app does not retrain models on every rerun. The production trainer in src/train.py separately compares 9 candidates with 5-fold CV, refits the CV winner, evaluates it on data/test_energy_data.csv, and writes artifacts/model.joblib. Trace both paths and notice that dashboard display-time caching and offline production training solve different problems.'
 ));
 
 

@@ -25,6 +25,15 @@ SRC = ROOT / 'src'
 app = Flask(__name__)
 
 
+@app.after_request
+def disable_dev_cache(response):
+    """Always serve the latest local CSS and lesson code during development."""
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+
 @app.route('/src/<path:filename>')
 def static_src(filename):
     """Serve files from website/src/ (JS, CSS, JSX)."""

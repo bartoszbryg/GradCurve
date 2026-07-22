@@ -6,7 +6,7 @@ window.BLOCKS[20] = [
   ['h2', 'The core update idea'],
   ['math', 'new_weight = old_weight - learning_rate × gradient'],
   ['p', 'The gradient tells the model which direction increases the loss. Subtracting the gradient moves the model in the opposite direction, toward lower loss.'],
-  ['code', 'src/models.py',
+  ['code', 'src/models/linear.py',
 `for _ in range(self.n_iter):
     net = X @ w[1:] + w[0]
     output = self._sigmoid(net)

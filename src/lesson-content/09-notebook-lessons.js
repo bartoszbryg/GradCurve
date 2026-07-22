@@ -188,7 +188,7 @@ window.BLOCKS[23] = [
   ]
 ];
 
-/* Extra numeric walkthroughs for the custom models in src/models.py. */
+/* Extra numeric walkthroughs for the custom models in src/models/. */
 window.BLOCKS[4].push(
   ['h2', 'What the weights look like after training'],
   ['p', 'These numbers come from training LogisticRegressionOvR on the scaled core features: Energy Consumption and Square Footage.'],

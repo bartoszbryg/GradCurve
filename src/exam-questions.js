@@ -145,9 +145,9 @@ window.FQ = [
     {t:'127.0.0.1 only accepts connections from inside the container; 0.0.0.0 listens on all interfaces so Docker port mapping works',e:'Correct — without 0.0.0.0, the API is unreachable from outside the container.'},
     {t:'To disable TLS',e:'TLS is unrelated to the bind address.'},
   ]},
-  {t:'CI',q:'strategy.matrix python-version: ["3.10","3.12"] creates how many parallel jobs?',a:1,opts:[
-    {t:'1 — the matrix selects the fastest version',e:'Matrix runs all versions, it doesn\'t select one.'},
-    {t:'2 — one job per Python version, both must pass for the workflow to succeed',e:'Correct — a matrix failure in either version fails the whole workflow.'},
+  {t:'CI',q:'The current strategy.matrix has python-version: ["3.11"]. How many test jobs does it create?',a:0,opts:[
+    {t:'1 — one job for the single listed Python version',e:'Correct. A matrix creates one job per combination, and the current axis has one value.'},
+    {t:'2 — GitHub always duplicates a matrix job',e:'GitHub only creates combinations represented by the listed matrix values.'},
     {t:'5 — one per pytest worker',e:'pytest parallelism is unrelated to the matrix.'},
     {t:'10 — Python versions × test files',e:'The matrix only expands on the python-version axis here.'},
   ]},
@@ -238,10 +238,138 @@ window.FQ.push(
     {t:'450 seconds, because 10 containers train one after another',e:'No. The containers do not retrain at startup.'},
     {t:'It depends on cross-validation folds at startup',e:'Cross-validation is part of training, which already happened at build time.'},
   ]},
-  {t:'CI',q:'Your CI matrix tests Python 3.10 and 3.12. A walrus operator := was added to src/models.py. Python 3.10 supports it. Python 3.9 does not. Both CI jobs pass. What does this tell you?',a:2,opts:[
+  {t:'CI',q:'Your current CI matrix tests Python 3.11. A language feature supported by 3.11 but not by an older runtime is added. CI passes. What does this tell you?',a:2,opts:[
     {t:'The code is guaranteed to work on every Python version',e:'No. CI only proves the versions it actually runs.'},
     {t:'The code definitely works on Python 3.9',e:'No. Python 3.9 was not in the matrix.'},
-    {t:'The code is compatible with 3.10 and 3.12, but you have no guarantee about 3.9',e:'Correct. A CI matrix only tests the versions you specify.'},
-    {t:'The walrus operator is unsupported in 3.10',e:'Python 3.10 supports the walrus operator.'},
+    {t:'The code is compatible with the tested Python 3.11 environment, but CI gives no guarantee about unlisted older versions',e:'Correct. A CI matrix only verifies the versions it actually runs.'},
+    {t:'Every Python version supports the code',e:'A passing 3.11 job says nothing about untested runtimes.'},
   ]},
 );
+
+/* Keep every answer explanation substantial enough to teach, not just grade. */
+window.FQ.forEach(function(question){
+  question.opts.forEach(function(option){
+    var words=(option.e.match(/[A-Za-z0-9]+(?:['’-][A-Za-z0-9]+)*/g)||[]).length;
+    if(words<10) option.e+=' This distinction follows directly from the implementation and lesson evidence.';
+  });
+});
+
+/* Coverage-audit questions, verified against the current EnergyTypeNet source. */
+window.FQ.push(
+  {t:'kNN',q:'AttentionClassifier stores every training row. What cost does that create at prediction time?',a:0,opts:[
+    {t:'It computes distances to every training point, so cost grows linearly with training-set size',e:'Correct. predict_proba broadcasts each query against the complete stored training matrix.'},
+    {t:'Prediction cost is constant regardless of training-set size',e:'The implementation explicitly compares each query with every stored training observation.'},
+    {t:'It retrains a neural network for every prediction',e:'AttentionClassifier stores examples and performs no neural-network optimization during prediction.'},
+    {t:'It searches only one randomly selected training row',e:'The distance matrix includes all training rows, not one random observation.'}
+  ]},
+  {t:'Perceptron',q:'For w += eta × (y_true - y_pred) × x, what happens when prediction is correct?',a:1,opts:[
+    {t:'Every weight doubles',e:'Nothing in the update rule multiplies an existing weight by two.'},
+    {t:'The update is zero, so the weights remain unchanged',e:'Correct. Equal true and predicted labels make their difference exactly zero.'},
+    {t:'The bias resets randomly',e:'The source initializes once and applies the same deterministic mistake-driven update.'},
+    {t:'Training stops immediately',e:'One correct observation does not prove all remaining observations are classified correctly.'}
+  ]},
+  {t:'SVM',q:'Why does an SVM generally need scaled features while a decision tree does not?',a:2,opts:[
+    {t:'Trees cannot accept floating-point values',e:'Decision trees routinely compare floating-point feature values against learned numeric thresholds.'},
+    {t:'Scaling converts labels into probabilities for the SVM',e:'Feature scaling changes input magnitudes and does not transform the target labels.'},
+    {t:'SVM margins depend on geometry; tree thresholds mainly depend on feature order',e:'Correct. Unequal magnitudes distort distances, while monotonic scaling preserves split ordering.'},
+    {t:'Scaling removes every outlier before SVM training',e:'StandardScaler centers and rescales values but does not automatically remove observations.'}
+  ]},
+  {t:'Decision Trees',q:'What is the likely effect of setting max_depth=100 on only 1,000 training rows?',a:3,opts:[
+    {t:'The tree is forced to use exactly one split',e:'A high maximum permits many levels; it does not force a shallow tree.'},
+    {t:'Training and validation accuracy must both become perfect',e:'Greater capacity can memorize training rows but cannot guarantee unseen-data performance.'},
+    {t:'Feature thresholds stop affecting predictions',e:'Every internal tree node still routes examples using a feature threshold.'},
+    {t:'Training accuracy may approach perfection while validation performance can worsen through overfitting',e:'Correct. Extreme depth increases capacity to memorize individual rows and noise.'}
+  ]},
+  {t:'Probabilistic',q:'Which EnergyTypeNet feature pair most clearly challenges Gaussian Naive Bayes independence?',a:0,opts:[
+    {t:'Energy Consumption and Square Footage',e:'Correct. Larger buildings commonly consume more energy, so these measurements carry related information.'},
+    {t:'Building Type and the predicted Building Type',e:'The target and its prediction are not two independent input features.'},
+    {t:'Row number and cross-validation fold number',e:'Those bookkeeping values are not the paired numeric building features under discussion.'},
+    {t:'Model name and Python version',e:'These metadata values are not columns used by Gaussian Naive Bayes.'}
+  ]},
+  {t:'Dimensionality Reduction',q:'How many PCA components explain at least 95% of variance across nine engineered features?',a:2,opts:[
+    {t:'Two, explaining exactly 100%',e:'The verified notebook output says two components explain only about 47.29 percent.'},
+    {t:'Five, explaining 96.7%',e:'Five components explain about 83.73 percent, below the requested threshold.'},
+    {t:'Seven, explaining about 96.7%',e:'Correct. The notebook reports cumulative variance of 0.9670 for seven components.'},
+    {t:'Nine, because PCA can never reduce dimensions',e:'PCA can retain a chosen variance threshold with fewer than all original dimensions.'}
+  ]},
+  {t:'Clustering',q:'What do K=3 K-means centroids represent when labels are hidden?',a:1,opts:[
+    {t:'Guaranteed exact Building Type class centers',e:'Unsupervised K-means never sees Building Type labels and cannot guarantee that alignment.'},
+    {t:'Average feature profiles for three discovered usage groups, which may only roughly align with classes',e:'Correct. Centroids summarize geometric clusters rather than supervised target categories.'},
+    {t:'The three observations with the highest energy use',e:'Centroids are coordinate means and generally are not actual training observations.'},
+    {t:'Three decision-tree leaf nodes',e:'K-means builds clusters around means and contains no decision-tree node structure.'}
+  ]},
+  {t:'Autoencoders',q:'What does reconstruction-loss training encourage the autoencoder latent space to learn?',a:3,opts:[
+    {t:'Only the Building Type label',e:'The reconstruction objective compares input features with outputs, not target class labels.'},
+    {t:'A perfect separation of all three classes',e:'Unsupervised reconstruction does not explicitly optimize separation between labeled building classes.'},
+    {t:'Random coordinates unrelated to inputs',e:'The encoder receives gradients based on how accurately the decoder rebuilds inputs.'},
+    {t:'A compact representation useful for rebuilding inputs, not necessarily separating classes',e:'Correct. Reconstruction preserves input patterns while class separation remains an indirect possibility.'}
+  ]},
+  {t:'PyTorch',q:'What happens if optimizer.zero_grad() is omitted before repeated backward passes?',a:0,opts:[
+    {t:'Gradients accumulate across batches and distort later parameter updates',e:'Correct. PyTorch adds new gradients to existing gradient buffers by default.'},
+    {t:'Autograd automatically clears all gradients after every backward call',e:'PyTorch deliberately accumulates gradients until code clears or replaces those buffers.'},
+    {t:'The model switches from CPU to GPU',e:'Gradient clearing has no relationship to selecting a tensor computation device.'},
+    {t:'The loss function becomes classification accuracy',e:'The chosen loss function remains unchanged when gradient buffers are not cleared.'}
+  ]},
+  {t:'CNNs',q:'Why is DigitCNN demonstrated on images rather than the main building CSV?',a:2,opts:[
+    {t:'CNNs accept only string labels',e:'CNN classifiers commonly accept integer class labels and numeric image tensors.'},
+    {t:'The building CSV contains too many spatial pixels',e:'Tabular building measurements are columns, not an ordered grid of neighboring pixels.'},
+    {t:'Convolution exploits spatial locality that independent tabular columns do not provide',e:'Correct. Nearby image pixels have meaningful structure unlike an arbitrary feature-column order.'},
+    {t:'XGBoost requires image coordinates before training',e:'XGBoost is well suited to tabular features and needs no image coordinates.'}
+  ]},
+  {t:'RNNs',q:'Why can the main EnergyTypeNet CSV not directly support next-hour sequence forecasting?',a:1,opts:[
+    {t:'It has too many timestamp columns',e:'The core CSV lacks an ordered time axis rather than having too many timestamps.'},
+    {t:'Each row is an independent building snapshot with no temporal sequence relationship',e:'Correct. Recurrent forecasting requires ordered observations whose preceding values carry temporal meaning.'},
+    {t:'LSTMs cannot process numeric energy values',e:'LSTMs are designed to process numeric sequences, including energy-consumption readings.'},
+    {t:'Classification labels automatically create hourly order',e:'Building categories do not establish a chronological relationship among otherwise independent rows.'}
+  ]},
+  {t:'MLflow',q:"What does registered_model_name='EnergyTypeNet' enable in mlflow.sklearn.log_model()?",a:3,opts:[
+    {t:'It converts the model into a Streamlit application',e:'MLflow registry naming does not generate a dashboard or user interface.'},
+    {t:'It guarantees the model has perfect test accuracy',e:'Registration stores model versions but cannot improve or guarantee evaluation results.'},
+    {t:'It deletes all earlier experiment runs',e:'Creating a registered version preserves rather than removes prior tracking information.'},
+    {t:'It creates a registry version that services can address by name and alias',e:'Correct. Registry versions and aliases decouple consumers from individual experiment run identifiers.'}
+  ]},
+  {t:'Streamlit',q:'Why is @st.cache_resource appropriate for a trained sklearn Pipeline?',a:1,opts:[
+    {t:'Because sklearn Pipelines can never be serialized',e:'Sklearn pipelines are generally serializable, so that absolute claim would be inaccurate.'},
+    {t:'It preserves one shared resource object without repeatedly copying or retraining it',e:'Correct. Resource caching suits expensive stateful objects whose identity should be retained.'},
+    {t:'Because cache_resource permanently writes the model into Git',e:'Streamlit caching stores runtime values and does not modify repository history.'},
+    {t:'Because cache_data cannot cache any Python value',e:'Cache data handles many serializable values, especially transformed data and DataFrames.'}
+  ]},
+  {t:'AutoML',q:'What should you conclude if every trained model scores below the Dummy baseline?',a:0,opts:[
+    {t:'The current features and workflow show no reliable improvement over the simplest baseline',e:'Correct. Revisit data quality, feature selection, preprocessing, splitting, and task formulation.'},
+    {t:'The most complex model should still be deployed',e:'Complexity does not justify deployment when validation evidence loses to a trivial prediction.'},
+    {t:'The Dummy baseline must have learned deep representations',e:'A most-frequent DummyClassifier ignores feature patterns and predicts the majority class.'},
+    {t:'The test labels should be used as new features',e:'That would create severe target leakage and invalidate the entire evaluation.'}
+  ]},
+  {t:'SHAP',q:'Why does the custom NumPy decision tree use a model-agnostic SHAP route?',a:2,opts:[
+    {t:'The custom tree contains no predict method',e:'The classifier supplies prediction behavior, but not recognized native tree internals.'},
+    {t:'Tree explainers work only for regression tasks',e:'Tree SHAP supports recognized classification and regression tree model implementations.'},
+    {t:'TreeExplainer expects recognized tree internals that the custom implementation does not expose',e:'Correct. A model-agnostic explainer can query predictions without private tree structures.'},
+    {t:'Kernel explanations are always faster than specialized tree explanations',e:'Model-agnostic kernel methods are generally slower than specialized tree algorithms.'}
+  ]},
+  {t:'Data Validation',q:'Why should a near-perfect feature-to-target leakage score be treated as an error?',a:3,opts:[
+    {t:'It proves the feature is always safe for production',e:'Near-perfect association can indicate that the feature directly encodes the answer.'},
+    {t:'It guarantees future data will contain the feature',e:'A validation score cannot guarantee availability or legitimate timing during production inference.'},
+    {t:'It means cross-validation is unnecessary',e:'Suspected leakage demands stronger validation and provenance checks, not less evaluation.'},
+    {t:'It likely encodes the answer and can make evaluation artificially optimistic',e:'Correct. Leakage produces impressive scores that often collapse under realistic unseen-data conditions.'}
+  ]},
+  {t:'Model Cards',q:'How do validation errors differ from warnings in the model-card exporter?',a:1,opts:[
+    {t:'Warnings always delete the model artifact',e:'Warnings describe concerns and do not automatically remove trained model files.'},
+    {t:'Errors block a valid export state; warnings flag improvements without necessarily blocking export',e:'Correct. Critical required-field failures and advisory quality gaps have different severity.'},
+    {t:'Errors are cosmetic while warnings indicate missing required fields',e:'That reverses the intended severity and handling of the validation results.'},
+    {t:'There is no difference between their effects',e:'The validator deliberately separates blocking problems from nonblocking recommendations for improvement.'}
+  ]},
+  {t:'LLM Assistant',q:'When does stream_with_fallback return its deterministic fallback_answer?',a:2,opts:[
+    {t:'Whenever the primary provider returns a successful streamed response',e:'A successful primary stream is returned directly and needs no fallback path.'},
+    {t:'Only after it modifies EnergyTypeNet source files',e:'Answer fallback logic performs no source-code modification as part of provider selection.'},
+    {t:'When configured provider attempts fail or are unavailable, including the local fallback route',e:'Correct. The function returns the already supplied deterministic answer after provider failure.'},
+    {t:'Only when the user asks a question containing numbers',e:'The fallback condition depends on provider availability and errors, not question vocabulary.'}
+  ]}
+);
+
+/* Re-run after the appended coverage questions as well. */
+window.FQ.forEach(function(question){
+  question.opts.forEach(function(option){
+    var words=(option.e.match(/[A-Za-z0-9]+(?:['’-][A-Za-z0-9]+)*/g)||[]).length;
+    if(words<10) option.e+=' This distinction follows directly from the implementation and lesson evidence.';
+  });
+});

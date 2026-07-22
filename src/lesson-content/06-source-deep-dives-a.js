@@ -1,7 +1,7 @@
 ﻿window.BLOCKS[1].push(
   ['h2', "Exact source code - Dataset"],
   ['p', "Why this exists: without this loader, every model would receive raw strings or mismatched columns and training would fail before learning starts."],
-  ['code', "src/data.py (exact source)", `def load_raw(filepath: str) -> pd.DataFrame:
+  ['code', "src/data.py", `def load_raw(filepath: str) -> pd.DataFrame:
     """Load the raw CSV data and remove empty rows."""
     return pd.read_csv(filepath).dropna()
 
@@ -63,7 +63,7 @@ X_all, y = load_features('data/train_energy_data.csv', 'all')
 window.BLOCKS[2].push(
   ['h2', "Exact source code - Feature Engineering"],
   ['p', "Why this exists: without engineered ratios, size hides usage intensity and similar-looking rows stay mixed together."],
-  ['code', "src/data.py (exact source)", `def make_engineered_features(df: pd.DataFrame):
+  ['code', "src/data.py", `def make_engineered_features(df: pd.DataFrame):
     """Create original and derived numeric features from a raw dataframe.
 
     Returns
@@ -139,7 +139,7 @@ X_fixed, names = make_engineered_features(problem_df)
 window.BLOCKS[3].push(
   ['h2', "Exact source code - Feature Scaling"],
   ['p', "Why this exists: without in-fold scaling, validation statistics leak into training and cross-validation becomes overly optimistic."],
-  ['code', "src/evaluation.py (exact source)", `def cross_validate_custom(
+  ['code', "src/evaluation.py", `def cross_validate_custom(
     model_cls,
     kwargs: dict,
     X: np.ndarray,
@@ -266,7 +266,7 @@ scores = cross_validate_custom(LogisticRegressionOvR, {}, X, y, make_skf(3))
 window.BLOCKS[4].push(
   ['h2', "Exact source code - Logistic Regression OvR"],
   ['p', "Why this exists: without this custom class, the lesson cannot show how one-vs-rest gradient updates are actually implemented."],
-  ['code', "src/models.py (exact source)", `class LogisticRegressionOvR(ClassifierMixin, BaseEstimator):
+  ['code', "src/models/linear.py", `class LogisticRegressionOvR(ClassifierMixin, BaseEstimator):
     """One-vs-rest multiclass logistic regression trained with gradient descent."""
 
     def __init__(
@@ -438,7 +438,7 @@ ovr = LogisticRegressionOvR(n_iter=3000).fit(X_scaled, y)
 window.BLOCKS[5].push(
   ['h2', "Exact source code - Softmax Regression"],
   ['p', "Why this exists: without softmax, class scores would not compete for one shared probability total."],
-  ['code', "src/models.py (exact source)", `class LogisticRegressionSoftmax(ClassifierMixin, BaseEstimator):
+  ['code', "src/models/linear.py", `class LogisticRegressionSoftmax(ClassifierMixin, BaseEstimator):
     """Multinomial logistic regression trained with softmax cross-entropy."""
 
     def __init__(
@@ -605,7 +605,7 @@ sm = LogisticRegressionSoftmax(alpha=0.01).fit(X_scaled, y)
 window.BLOCKS[6].push(
   ['h2', "Exact source code - Attention Classifier"],
   ['p', "Why this exists: without this memory-based classifier, the project has no simple model that can follow local curved boundaries."],
-  ['code', "src/models.py (exact source)", `class AttentionClassifier(ClassifierMixin, BaseEstimator):
+  ['code', "src/models/linear.py", `class AttentionClassifier(ClassifierMixin, BaseEstimator):
     """Kernel-weighted nearest-neighbor classifier."""
 
     def __init__(self, w: float = 1.0):
@@ -685,7 +685,7 @@ attn = AttentionClassifier(w=10.0).fit(X_scaled, y)
 window.BLOCKS[7].push(
   ['h2', "Exact source code - XGBoost"],
   ['p', "Why this exists: without build_models(), every training run would hand-construct different estimators and comparisons would stop being reproducible."],
-  ['code', "src/train.py (exact source)", `def build_models(random_state: int = 42) -> dict:
+  ['code', "src/train.py", `def build_models(random_state: int = 42) -> dict:
     """Build all candidate models used by the training script."""
     lr = make_pipeline(
         StandardScaler(),
@@ -842,7 +842,7 @@ xgb = build_models()['xgboost'].fit(X_train, y_train)
 window.BLOCKS[8].push(
   ['h2', "Exact source code - Neural Network (MLP)"],
   ['p', "Why this exists: without the pipeline wrapper, the neural network would train on unscaled raw magnitudes and converge poorly."],
-  ['code', "src/train.py (exact source)", `def build_models(random_state: int = 42) -> dict:
+  ['code', "src/train.py", `def build_models(random_state: int = 42) -> dict:
     """Build all candidate models used by the training script."""
     lr = make_pipeline(
         StandardScaler(),
@@ -999,7 +999,7 @@ mlp.fit(X_train_ext, y_train)
 window.BLOCKS[9].push(
   ['h2', "Exact source code - Ensemble Methods"],
   ['p', "Why this exists: without ensembles, the project cannot combine linear, neural, and tree models into one stronger decision."],
-  ['code', "src/train.py (exact source)", `def build_models(random_state: int = 42) -> dict:
+  ['code', "src/train.py", `def build_models(random_state: int = 42) -> dict:
     """Build all candidate models used by the training script."""
     lr = make_pipeline(
         StandardScaler(),
@@ -1156,7 +1156,7 @@ results = evaluate_models({'vote': voting, 'stack': stacking}, X, y)
 window.BLOCKS[10].push(
   ['h2', "Exact source code - Cross-Validation"],
   ['p', "Why this exists: without stratified folds, one fold could contain too few examples of a class and the score would be noisy."],
-  ['code', "src/evaluation.py (exact source)", `def make_skf(n_splits: int = 5, random_state: int = 42) -> StratifiedKFold:
+  ['code', "src/evaluation.py", `def make_skf(n_splits: int = 5, random_state: int = 42) -> StratifiedKFold:
     """Create the stratified cross-validation splitter used across notebooks."""
     return StratifiedKFold(
         n_splits=n_splits,

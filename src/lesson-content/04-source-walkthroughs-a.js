@@ -1167,10 +1167,10 @@ docker run -it --rm energytypenet /bin/bash
 # → <class 'sklearn.pipeline.Pipeline'>`],
   ['callout','info','What this tells you','The ~850MB image size is large for a container, but manageable. Most of it is the Python packages (numpy, pandas, xgboost, scikit-learn, fastapi, streamlit). If image size matters (pulling from a registry), you could use multi-stage builds to separate the build environment from the runtime environment — but that is an advanced optimisation.'],
   ['callout','analogy','Real world — food manufacturing clean room','A food factory ships sealed sterile packages. The package controls the exact environment (atmosphere, humidity, temperature) around the food — it does not matter whether the package is opened in Tokyo or Toronto, the contents are identical. A Docker image is the sealed sterile package for software: the environment inside is fixed at build time and identical anywhere it runs.'],
-  ['quiz',[{q:'You change a comment in src/models.py (no functional change). Which Docker layers need to re-run when you rebuild?',a:2,opts:[
+  ['quiz',[{q:'You change a comment in src/models/linear.py (no functional change). Which Docker layers need to re-run when you rebuild?',a:2,opts:[
     {t:'All layers from FROM to CMD must re-run — Docker cannot detect that the change is only a comment',e:'Docker uses a content hash of each instruction and its context files. Any change to a file that appears in a COPY instruction invalidates that layer and all subsequent ones.'},
     {t:'No layers re-run — Docker detects that the compiled bytecode is identical',e:'Docker does not inspect Python bytecode. It hashes file contents. A changed comment changes the file hash.'},
-    {t:'The "COPY . ." layer and all layers after it re-run. The "pip install" layer remains cached because requirements.txt was not changed',e:'Correct! COPY . . includes src/models.py. Its content changed, so that layer\'s cache is invalidated. But requirements.txt is unchanged, so the pip layer stays cached.'},
+    {t:'The "COPY . ." layer and all layers after it re-run. The "pip install" layer remains cached because requirements.txt was not changed',e:'Correct! COPY . . includes src/models/linear.py. Its content changed, so that layer\'s cache is invalidated. But requirements.txt is unchanged, so the pip layer stays cached.'},
     {t:'Only the final CMD layer re-runs to restart the server process',e:'CMD is executed at runtime, not build time. It is not a build layer.'},
   ]},
     {q:'Concept check. Why should you test a model on data it did not train on?',a:2,opts:[
@@ -1325,8 +1325,8 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ['3.10', '3.12']
-    # Creates 2 parallel jobs: one on Python 3.10, one on 3.12
+        python-version: ['3.11']
+    # Creates one test job for the currently supported CI runtime
     # Catches compatibility regressions across Python versions
 
     steps:
@@ -1351,14 +1351,14 @@ jobs:
   ['code', 'Real output', `# GitHub Actions run log (all passing):
 # ✓ Set up job
 # ✓ actions/checkout@v4          (clone repo: ~3s)
-# ✓ actions/setup-python@v5      (install Python 3.12: ~15s)
+# ✓ actions/setup-python@v5      (install Python 3.11)
 # ✓ Install dependencies         (pip install: ~90s on first run, cached after)
 # ✓ Run tests                    (pytest -q: 23 passed in 8.3s)
 # ✓ Verify imports               (all modules import cleanly: ~2s)
 # Total wall time: ~2.5 minutes
-# Both Python 3.10 and 3.12 jobs pass → green ✓ shown on pull request`],
+# Python 3.11 tests pass, then the dependent deploy-check runs → green ✓`],
   ['code', 'Three ways to call this', `# Call 1 — automatic (triggered by git push)
-git add src/models.py
+git add src/models/linear.py
 git commit -m "fix: clip weights in attention classifier"
 git push                         # CI starts automatically on GitHub
 
@@ -1370,7 +1370,7 @@ python -c "from src.models import AttentionClassifier"  # same as CI step 5
 # Call 3 — check CI status via GitHub CLI
 gh run list --limit 5             # show last 5 CI runs
 gh run view <run-id>              # detailed log for one run`],
-  ['callout','info','What this tells you','A green CI ✓ means: (a) all 23+ tests pass on a fresh Ubuntu VM, (b) every module imports cleanly, (c) this holds on both Python 3.10 and 3.12. It does NOT mean the model accuracy is good — CI tests correctness of code, not performance of the ML model. Accuracy is measured separately by train.py and MLflow.'],
+  ['callout','info','What this tells you','A green CI ✓ means the test suite and import checks passed on a fresh Ubuntu VM with Python 3.11, followed by the configured deploy checks. It does not prove compatibility with unlisted Python versions, and it does not mean model accuracy is good—performance is measured separately by train.py and MLflow.'],
   ['callout','analogy','Real world — aviation pre-flight checklist','A pilot completes the same checklist before every flight: fuel checked, flaps tested, radio working. It does not matter how experienced the pilot is or how rushed they are — the checklist runs every time. GitHub Actions is the automated pre-flight checklist for code: no matter how small the change, the tests always run before the code is allowed to fly to production.'],
   ['quiz',[{q:'A developer adds a new function to src/data.py with a syntax error in it — a missing colon after a for loop. The function is never called in any test. Will CI catch this?',a:1,opts:[
     {t:'No — pytest only catches errors in code that tests explicitly call. A syntax error in an uncalled function goes undetected',e:'Actually, Python raises SyntaxError when the MODULE is imported, not when the specific function is called. All functions are parsed at import time.'},

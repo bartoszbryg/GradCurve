@@ -1,7 +1,7 @@
 ﻿window.BLOCKS[16].push(
-  ['h2', "Exact source code - Streamlit Dashboard"],
-  ['p', "Why this exists: without caching, every slider movement would reload data or retrain models and the dashboard would feel broken."],
-  ['code', "dashboard.py (exact source)", `def _load_energy():
+  ['h2', "Streamlit dashboard caching architecture"],
+  ['p', "This educational sketch combines the dashboard data-loading path with its model-resource fallback. In the current source, dashboard.py defines _load_energy() and _load_energy_resources(), while src/preloaded_artifacts.py defines train_energy_models()."],
+  ['code', "Caching architecture (educational sketch)", `def _load_energy():
     train_df = load_raw('data/train_energy_data.csv')
     test_df = load_raw('data/test_energy_data.csv')
 
@@ -586,7 +586,7 @@ render_energy_dashboard('Live Prediction')
 window.BLOCKS[17].push(
   ['h2', "Exact source code - GitHub Actions CI"],
   ['p', "Why this exists: without CI, syntax errors and broken imports can reach the repository without an automatic safety check."],
-  ['code', ".github/workflows/ci.yml (exact source)", `name: CI
+  ['code', ".github/workflows/ci.yml", `name: CI
 
 on:
   push:
@@ -597,7 +597,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.10', '3.12']
+        python-version: ['3.11']
 
     steps:
       - uses: actions/checkout@v4
@@ -630,7 +630,7 @@ jobs:  # continue statement
     runs-on: ubuntu-latest  # continue statement
     strategy:  # continue statement
       matrix:  # continue statement
-        python-version: ['3.10', '3.12']  # continue statement
+        python-version: ['3.11']  # current tested runtime
 
     steps:  # continue statement
       - uses: actions/checkout@v4  # continue statement
@@ -672,7 +672,7 @@ git push
 # Output changes: pytest or import verification fails`],
   ['callout', 'info', 'What this tells you', '- Real code uses the same names you see in src/.\n- Real outputs anchor the lesson in training data, not guesses.\n- Changing arguments changes shapes, scores, speed, or validation behavior.'],
   ['callout', 'analogy', 'Real world', "In a bank, hospital, factory, or retail chain, this same pattern prevents teams from trusting examples that do not match the production code."],
-  ['quiz', [{q:"What happens if you change the CI matrix from Python 3.10 and 3.12 to only 3.12?",a:3,opts:[{t:"The test suite runs on more Python versions.",e:"It runs on fewer versions."},{t:"pytest stops running.",e:"The Run tests step remains."},{t:"Imports are no longer checked.",e:"The import verification step remains."},{t:"Compatibility with Python 3.10 is no longer automatically verified.",e:"Correct. CI coverage becomes narrower."}]},
+  ['quiz', [{q:"What happens if you add Python 3.12 beside the current 3.11 matrix entry?",a:3,opts:[{t:"The test suite runs on fewer Python versions.",e:"It runs on one additional version."},{t:"pytest stops running.",e:"The Run tests step remains."},{t:"Imports are no longer checked.",e:"The import verification step remains."},{t:"The test job runs once for 3.11 and once for 3.12, expanding compatibility coverage.",e:"Correct. Each matrix value creates a job."}]},
     {q:'Concept check. Why should you test a model on data it did not train on?',a:2,opts:[
       {t:'Because training data is always stored in a different file format',e:'File format is not the reason. The issue is whether the model generalizes beyond rows it already saw.'},
       {t:'Because unseen data makes the model train faster',e:'Validation does not speed up training. It measures whether training learned a useful pattern.'},
@@ -701,7 +701,7 @@ git push
 window.BLOCKS[18].push(
   ['h2', "Exact source code - AutoML Assistant"],
   ['p', "Why this exists: without a profile step, the assistant cannot quickly spot missing values, likely targets, or unusable columns."],
-  ['code', "src/automl.py (exact source)", `def profile_dataset(df: pd.DataFrame) -> dict[str, Any]:
+  ['code', "src/automl.py", `def profile_dataset(df: pd.DataFrame) -> dict[str, Any]:
     """Create a compact profile used by the assistant and dashboard."""
     rows = []
 
@@ -779,7 +779,7 @@ profile = profile_dataset(df_with_nulls)
 window.BLOCKS[19].push(
   ['h2', "Exact source code - Codebase Tour"],
   ['p', "Why this exists: without prediction helpers, the API and command line would duplicate fragile artifact-loading logic."],
-  ['code', "src/predict.py (exact source)", `def load_artifact(model_path: str = 'artifacts/model.joblib') -> dict:
+  ['code', "src/predict.py", `def load_artifact(model_path: str = 'artifacts/model.joblib') -> dict:
     """Load a saved model artifact from disk."""
     path = Path(model_path)
 
@@ -871,7 +871,7 @@ rows = predict_dataframe(test_df.head(10), artifact)
 window.BLOCKS[20].push(
   ['h2', "Exact source code - Gradient Descent"],
   ['p', "Why this exists: without the gradient update, the model would never improve its weights from their random starting values."],
-  ['code', "src/models.py (exact source)", `class LogisticRegressionOvR(ClassifierMixin, BaseEstimator):
+  ['code', "src/models/linear.py", `class LogisticRegressionOvR(ClassifierMixin, BaseEstimator):
     """One-vs-rest multiclass logistic regression trained with gradient descent."""
 
     def __init__(
@@ -1043,7 +1043,7 @@ LogisticRegressionOvR(alpha=0.1).fit(X_scaled, y)
 window.BLOCKS[21].push(
   ['h2', "Exact source code - Overfitting"],
   ['p', "Why this exists: without repeated validation, a model can memorize training rows and still look successful on paper."],
-  ['code', "src/train.py (exact source)", `def evaluate_models(models: dict, X: np.ndarray, y: np.ndarray) -> dict:
+  ['code', "src/train.py", `def evaluate_models(models: dict, X: np.ndarray, y: np.ndarray) -> dict:
     """Evaluate candidate models with stratified cross-validation."""
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     results = {}
@@ -1124,7 +1124,7 @@ results = evaluate_models(build_models(), X_ext, y)
 window.BLOCKS[22].push(
   ['h2', "Exact source code - Reading Your Results"],
   ['p', "Why this exists: without a single results dictionary, the app cannot consistently pick the best model, save metrics, or explain tradeoffs."],
-  ['code', "src/train.py (exact source)", `def evaluate_models(models: dict, X: np.ndarray, y: np.ndarray) -> dict:
+  ['code', "src/train.py", `def evaluate_models(models: dict, X: np.ndarray, y: np.ndarray) -> dict:
     """Evaluate candidate models with stratified cross-validation."""
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     results = {}
